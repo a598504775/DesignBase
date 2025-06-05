@@ -1,6 +1,4 @@
 # DesignBase
-A full-stack platform to archive and search design project assets using metadata and AI summaries.
-# DesignBase
 
 DesignBase is a full-stack platform to help architecture and design teams **archive, search, and reuse project assets** such as images, diagrams, and notes. By leveraging structured metadata and AI-generated summaries, DesignBase makes design knowledge more discoverable and reusable across teams and phases.
 
