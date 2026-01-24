@@ -2,17 +2,19 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { ProjectCreateForm } from '@/components/ProjectCreateForm';
+import { createClient } from "@/utils/supabase/client";
 
 type Project = {
-  id: string;
-  title: string;
-  description: string | null;
-  cover_url: string | null;
-  asset_count?: number | null;
-  updated_at?: string | null;
+  id: string,
+  title: string,
+  description: string | null,
+  cover_image_url: string | null,
+  location: string | null,
+  created_at?: string
 };
 
 type LoadState = 'idle' | 'loading' | 'error' | 'ready';
+const supabase = createClient();
 
 export default function ProjectsPage() {
   // 1) Toolbar state
@@ -38,9 +40,12 @@ export default function ProjectsPage() {
         // if (error) throw error;
         // if (!cancelled) setProjects(data ?? []);
 
-        await new Promise((r) => setTimeout(r, 250)); // 模拟加载
+        // await new Promise((r) => setTimeout(r, 250)); // 模拟加载
+        const { data, error } = await supabase.from('projects').select('*').order('created_at', {ascending: false});
+        if (error) throw error;
+
         if (!cancelled) {
-          setProjects([]); // v0：默认空，方便你先把空状态做出来
+          setProjects(data ?? []);
           setLoadState('ready');
         }
       } catch (e: any) {
@@ -138,34 +143,28 @@ function PageHeader(props: {
 /** ========== 分区 2：List 容器 + Row（封面 / 标题 / 描述 / 轻量信息） ========== */
 function ProjectsList({ projects }: { projects: Project[] }) {
   return (
-    <div className="overflow-hidden rounded-2xl border border-neutral-200 bg-white">
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {projects.map((p) => (
-        <ProjectRow key={p.id} project={p} />
+        <ProjectCard key={p.id} project={p} />
       ))}
     </div>
   );
 }
 
-function ProjectRow({ project }: { project: Project }) {
+
+function ProjectCard({ project }: { project: Project }) {
   return (
     <a
       href={`/projects/${project.id}`}
-      className="flex items-center gap-4 border-b border-neutral-100 p-4 hover:bg-neutral-50"
+      className="h-80 group overflow-hidden bg-white transition hover:shadow-md"
     >
-      <CoverThumb url={project.cover_url} />
-
-      <div className="min-w-0 flex-1">
-        <div className="truncate text-sm font-semibold text-neutral-900">
-          {project.title || 'Untitled Project'}
-        </div>
-        <div className="mt-1 line-clamp-2 text-sm text-neutral-600">
-          {project.description || 'No description yet.'}
-        </div>
+      <CoverThumb url={project.cover_image_url}/>
+      <div className="mt-1 truncate text-sm text-neutral-600">
+        {project.location || '-'}
       </div>
-
-      <div className="hidden shrink-0 text-right text-xs text-neutral-500 sm:block">
-        <div>{project.asset_count ?? '—'} assets</div>
-        <div className="mt-1">{project.updated_at ? formatDate(project.updated_at) : '—'}</div>
+      
+      <div className="mt-0 line-clamp-3 text-sm leading-6 text-neutral-700 ">
+        {project.description || 'No description yet'}
       </div>
     </a>
   );
@@ -177,12 +176,12 @@ function CoverThumb({ url }: { url: string | null }) {
       <img
         src={url}
         alt="cover"
-        className="h-14 w-20 shrink-0 rounded-xl object-cover ring-1 ring-neutral-200"
+        className="h-40 w-full shrink-0 object-cover transition group-hover:scale-[1.02]"
       />
     );
   }
   return (
-    <div className="flex h-14 w-20 shrink-0 items-center justify-center rounded-xl bg-neutral-100 text-xs text-neutral-500 ring-1 ring-neutral-200">
+    <div className="flex h-14 w-full shrink-0 items-center justify-center bg-neutural-100 text0sm text-neutral-500">
       No cover
     </div>
   );
