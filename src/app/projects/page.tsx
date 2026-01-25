@@ -40,7 +40,6 @@ export default function ProjectsPage() {
         // if (error) throw error;
         // if (!cancelled) setProjects(data ?? []);
 
-        // await new Promise((r) => setTimeout(r, 250)); // 模拟加载
         const { data, error } = await supabase.from('projects').select('*').order('created_at', {ascending: false});
         if (error) throw error;
 
@@ -81,7 +80,7 @@ export default function ProjectsPage() {
 
   return (
     <div className="mx-auto w-full max-w-5xl px-6 py-8">
-      <PageHeader
+      <SearchBar
         query={query}
         onQueryChange={setQuery}
         onClickCreate={() => setIsCreateOpen(true)}
@@ -114,7 +113,7 @@ export default function ProjectsPage() {
 }
 
 /** ========== 分区 1：PageHeader / Toolbar（Search + Create） ========== */
-function PageHeader(props: {
+function SearchBar(props: {
   query: string;
   onQueryChange: (v: string) => void;
   onClickCreate: () => void;
@@ -181,7 +180,7 @@ function CoverThumb({ url }: { url: string | null }) {
     );
   }
   return (
-    <div className="flex h-14 w-full shrink-0 items-center justify-center bg-neutural-100 text0sm text-neutral-500">
+    <div className="flex h-44 w-full shrink-0 items-center justify-center bg-neutural-100 text0sm text-neutral-500">
       No cover
     </div>
   );
