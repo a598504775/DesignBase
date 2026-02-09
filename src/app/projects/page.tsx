@@ -105,7 +105,8 @@ export default function ProjectsPage() {
       {isCreateOpen && (
         <Modal title="Create Project" onClose={() => setIsCreateOpen(false)}>
           {/* 你在 ProjectCreateForm 里只要在创建成功时调用 onCreated 即可 */}
-          <ProjectCreateForm onCreated={handleCreated} onCancel={() => setIsCreateOpen(false)} />
+          {/* <ProjectCreateForm onCreated={handleCreated} onCancel={() => setIsCreateOpen(false)} /> */}
+          <ProjectCreateForm/>
         </Modal>
       )}
     </div>
@@ -119,7 +120,7 @@ function SearchBar(props: {
   onClickCreate: () => void;
 }) {
   return (
-    <div className="flex items-center gap-3">
+    <div className="flex items-center ">
       <div className="flex-1">
         <input
           value={props.query}

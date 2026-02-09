@@ -6,6 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { createClient } from "@/utils/supabase/client";
+import UploadAssetsModal from "./UploadAssetsModal";
 
 const supabase = createClient();
 
@@ -36,6 +37,7 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
   const [assets, setAssets] = useState<DbAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [errMsg, setErrMsg] = useState<string | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   // placeholder：你说 search 先摆设，我们先存起来，后面一行就能接 filter
   const [query, setQuery] = useState("");
@@ -169,6 +171,13 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
           >
             Upload Asset
           </Link>
+          <button
+            onClick={() => setUploadOpen(true)}
+            className="px-3 py-2 border rounded-lg text-sm hover:opacity-90 bg-foreground text-background"
+          >
+              Upload Asset
+          </button>
+
         </div>
       </div>
 
@@ -263,6 +272,16 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
           )}
         </div>
       </div>
+
+
+      {uploadOpen && (
+            <UploadAssetsModal
+              onClose={() => setUploadOpen(false)}
+              open={uploadOpen}
+              projectId={projectId}
+            />
+      )}
+
     </div>
   );
 }
