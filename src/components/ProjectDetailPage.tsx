@@ -164,20 +164,13 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
             Back
           </Link>
 
-          {/* 先给一个入口，后面你做 upload 真的完善时可以直接接 projectId */}
-          <Link
-            className="rounded-lg bg-foreground px-3 py-2 text-sm text-background hover:opacity-90"
-            href={`/upload?projectId=${encodeURIComponent(projectId)}`}
-          >
-            Upload Asset
-          </Link>
+
           <button
             onClick={() => setUploadOpen(true)}
             className="px-3 py-2 border rounded-lg text-sm hover:opacity-90 bg-foreground text-background"
           >
               Upload Asset
           </button>
-
         </div>
       </div>
 
