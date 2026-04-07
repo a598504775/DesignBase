@@ -157,7 +157,14 @@ export default function UploadAssetsModal ({open, onClose, projectId, onUpdated}
                 </div>
 
                 {/* Body */}
-                <div className="rounded-2xl border overflow-hidden">
+                <div 
+                    className="rounded-2xl border overflow-hidden"
+                    onDrop={(e) => {
+                        e.preventDefault();
+                        handleFilesChosen(e.dataTransfer.files);
+                    }}
+                    onDragOver={(e) => e.preventDefault()}
+                >
                     {pending?.length === 0 ? 
                         (<div className="p-6 text-sm text-muted-foreground">No files added yet. Click <span className="font-medium">“Add”</span> to select files.</div>) : (
                             pending.map((p) => {
@@ -220,6 +227,7 @@ export default function UploadAssetsModal ({open, onClose, projectId, onUpdated}
                 <input
                 ref={fileInputHtml}
                 type="file"
+                multiple
                 className="hidden"
                 onChange={(e) => handleFilesChosen(e.target.files)}
                 >

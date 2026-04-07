@@ -8,7 +8,7 @@ import Link from "next/link";
 import { createClient } from "@/utils/supabase/client";
 import UploadAssetsModal from "./UploadAssetsModal";
 
-const supabase = createClient();
+
 
 type DbProject = {
   id: string;
@@ -25,6 +25,7 @@ type DbAsset = {
   notes: string | null;
   thumb_url: string | null;
   created_at: string;
+  storage_path: string | null;
 };
 
 function formatDate(iso: string) {
@@ -33,57 +34,105 @@ function formatDate(iso: string) {
 }
 
 export default function ProjectDetailPage({ projectId }: { projectId: string }) {
+  const supabase = useMemo(() => createClient(), []);
   const [project, setProject] = useState<DbProject | null>(null);
   const [assets, setAssets] = useState<DbAsset[]>([]);
   const [loading, setLoading] = useState(true);
   const [errMsg, setErrMsg] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
 
-  // placeholder：你说 search 先摆设，我们先存起来，后面一行就能接 filter
-  const [query, setQuery] = useState("");
+  //Selection Mode
+  const [hoveredAssetId, setHoveredAssetId] = useState<string | null>(null);
+  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
+  const [deleting, setDeleting] = useState(false);
+  const isSelectionMode = selectedAssetIds.length > 0;
 
-  useEffect(() => {
-    let canceled = false;
 
-    async function load() {
-      setLoading(true);
-      setErrMsg(null);
+  function toggleAssetSelected(assetId: string) {
+    setSelectedAssetIds((prev) =>
+      prev.includes(assetId)
+        ? prev.filter((id) => id !== assetId)
+        : [...prev, assetId]
+    );
+  }
+  async function deleteSelectedAssets() {
+    if (selectedAssetIds.length === 0) return;
 
-      try {
-        const p = await supabase
-          .from("projects")
-          .select("id,title,description,cover_image_url,created_at")
-          .eq("id", projectId)
-          .single();
+    const confirmed = window.confirm(
+      `Delete ${selectedAssetIds.length} selected asset(s)?`
+    );
+    if (!confirmed) return;
 
-        if (p.error) throw p.error;
+    setDeleting(true);
 
-        const a = await supabase
-          .from("assets")
-          .select("id,project_id,file_name,notes,thumb_url,created_at")
-          .eq("project_id", projectId)
-          .order("created_at", { ascending: false });
+    try {
+      const selectedAssets = assets.filter((a) => selectedAssetIds.includes(a.id));
+      const paths = selectedAssets
+        .map((a) => a.storage_path)
+        .filter((p): p is string => Boolean(p));
 
-        if (a.error) throw a.error;
+      if (paths.length > 0) {
+        const storageRes = await supabase.storage
+          .from("designbase-assets")
+          .remove(paths);
 
-        if (!canceled) {
-          setProject(p.data as DbProject);
-          setAssets((a.data ?? []) as DbAsset[]);
-        }
-      } catch (e: any) {
-        if (!canceled) {
-          setErrMsg(e?.message ?? "Load failed");
-        }
-      } finally {
-        if (!canceled) setLoading(false);
+        if (storageRes.error) throw storageRes.error;
       }
-    }
 
-    load();
-    return () => {
-      canceled = true;
-    };
-  }, [projectId]);
+      const dbRes = await supabase
+        .from("assets")
+        .delete()
+        .in("id", selectedAssetIds);
+
+      if (dbRes.error) throw dbRes.error;
+
+      setAssets((prev) => prev.filter((a) => !selectedAssetIds.includes(a.id)));
+      setSelectedAssetIds([]);
+      setHoveredAssetId(null);
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message ?? "Delete failed");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  // placeholder：filter
+  const [query, setQuery] = useState("");
+  async function loadProjectDetail() {
+    setLoading(true);
+    setErrMsg(null);
+
+    try {
+      const p = await supabase
+        .from("projects")
+        .select("id,title,description,cover_image_url,created_at")
+        .eq("id", projectId)
+        .single();
+
+      if (p.error) throw p.error;
+
+      const a = await supabase
+        .from("assets")
+        .select("id,project_id,file_name,notes,thumb_url,created_at,storage_path")
+        .eq("project_id", projectId)
+        .order("created_at", { ascending: false });
+
+      if (a.error) throw a.error;
+
+      setProject(p.data as DbProject);
+      setAssets((a.data ?? []) as DbAsset[]);
+    } catch (e: any) {
+      setErrMsg(e?.message ?? "Load failed");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+useEffect(() => {
+  loadProjectDetail();
+}, [projectId, supabase]);
+
 
   const filteredAssets = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -113,11 +162,11 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
     return (
       <div className="mx-auto max-w-5xl p-6">
         <div className="rounded-xl border p-4">
-          <div className="text-lg font-semibold">加载失败</div>
+          <div className="text-lg font-semibold">Loading failed</div>
           <div className="mt-2 text-sm text-muted-foreground">{errMsg}</div>
           <div className="mt-4">
             <Link className="underline" href="/projects">
-              返回项目列表
+              Return to the project list
             </Link>
           </div>
         </div>
@@ -132,7 +181,7 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
           <div className="text-lg font-semibold">项目不存在</div>
           <div className="mt-4">
             <Link className="underline" href="/projects">
-              返回项目列表
+              Return to the project list
             </Link>
           </div>
         </div>
@@ -157,6 +206,25 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
         </div>
 
         <div className="flex shrink-0 items-center gap-3">
+          {isSelectionMode && (
+            <button
+              className="rounded-lg border px-3 py-2 text-sm hover:bg-muted"
+              onClick={() => setSelectedAssetIds([])}
+              disabled={deleting}
+            >
+              Cancel
+            </button>
+          )}
+          {isSelectionMode && (
+            <button
+              className="rounded-lg border border-red-200 px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+              onClick={deleteSelectedAssets}
+              disabled={deleting}
+            >
+              {deleting ? "Deleting..." : `Delete (${selectedAssetIds.length})`}
+            </button>
+          )}
+
           <Link
             className="rounded-lg border px-3 py-2 text-sm hover:bg-muted"
             href="/projects"
@@ -217,16 +285,30 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
         <div className="mt-4">
           {filteredAssets.length === 0 ? (
             <div className="rounded-xl border p-6 text-sm text-muted-foreground">
-              这个项目还没有任何资产。你可以先点右上角 Upload Asset 传第一张图，确认闭环没问题，然后我们再做 Asset Detail / Tag / 搜索。
+              No asset.
             </div>
           ) : (
             <div className="divide-y rounded-2xl border">
               {filteredAssets.map((a) => (
-                <Link
-                  key={a.id}
-                  href={`/assets/${a.id}`}
-                  className="flex gap-4 p-4 hover:bg-muted/40"
-                >
+              <div
+                key={a.id}
+                className="flex gap-4 p-4 hover:bg-muted/40"
+                onMouseEnter={() => setHoveredAssetId(a.id)}
+                onMouseLeave={() => setHoveredAssetId((prev) => (prev === a.id ? null : prev))}
+              >
+                <div className="w-5 shrink-0 pt-1">
+                  {(isSelectionMode || hoveredAssetId === a.id) && (
+                    <input
+                      type="checkbox"
+                      checked={selectedAssetIds.includes(a.id)}
+                      onChange={() => toggleAssetSelected(a.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      disabled={deleting}
+                    />
+                  )}
+                </div>
+
+                <Link href={`/assets/${a.id}`} className="flex flex-1 gap-4 min-w-0">
                   <div className="relative h-16 w-20 overflow-hidden rounded-lg bg-muted sm:h-20 sm:w-28">
                     {a.thumb_url ? (
                       <Image
@@ -260,6 +342,7 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
                     </div>
                   </div>
                 </Link>
+              </div>
               ))}
             </div>
           )}
@@ -272,6 +355,7 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
               onClose={() => setUploadOpen(false)}
               open={uploadOpen}
               projectId={projectId}
+              onUpdated={loadProjectDetail}
             />
       )}
 

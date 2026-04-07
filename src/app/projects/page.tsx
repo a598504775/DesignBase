@@ -6,17 +6,30 @@ import { createClient } from "@/utils/supabase/client";
 
 type Project = {
   id: string,
-  title: string,
+  title: string | null,
   description: string | null,
   cover_image_url: string | null,
   location: string | null,
-  created_at?: string
+  created_at?: string,
 };
 
 type LoadState = 'idle' | 'loading' | 'error' | 'ready';
-const supabase = createClient();
+
 
 export default function ProjectsPage() {
+  const supabase = createClient();
+
+  // Control the visibility of dot icon of project tiles
+  const [openMenuProjectId, setOpenMenuProjectId] = useState<string | null>(null);
+  useEffect(() => {
+    function handleGlobalClick() {
+      setOpenMenuProjectId(null);
+    }
+
+    window.addEventListener("click", handleGlobalClick);
+    return () => window.removeEventListener("click", handleGlobalClick);
+  }, []);
+  
   // 1) Toolbar state
   const [query, setQuery] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -78,6 +91,58 @@ export default function ProjectsPage() {
     setIsCreateOpen(false);
   }
 
+  // 6) Delete project
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
+  async function handleDeleteProject(projectId: string) {
+    const confirmed = window.confirm(
+      "Delete this project? This will permanently delete the project, its assets, and related tag links."
+    );
+    if (!confirmed) return;
+
+    setDeletingProjectId(projectId);
+
+    try {
+      // 1) Load all assets under this project, mainly to collect storage paths
+      const assetsRes = await supabase
+        .from("assets")
+        .select("id, storage_path")
+        .eq("project_id", projectId);
+
+      if (assetsRes.error) throw assetsRes.error;
+
+      const paths =
+        (assetsRes.data ?? [])
+          .map((a) => a.storage_path)
+          .filter((p): p is string => Boolean(p));
+
+      // 2) Remove files from storage first
+      if (paths.length > 0) {
+        const storageRes = await supabase.storage
+          .from("designbase-assets")
+          .remove(paths);
+
+        if (storageRes.error) throw storageRes.error;
+      }
+
+      // 3) Delete project row
+      // assets + project_tags should be removed by DB cascade
+      const projectRes = await supabase
+        .from("projects")
+        .delete()
+        .eq("id", projectId);
+
+      if (projectRes.error) throw projectRes.error;
+
+      // 4) Update local state
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message ?? "Delete project failed.");
+    } finally {
+      setDeletingProjectId(null);
+    }
+  }
+
   return (
     <div className="mx-auto w-full max-w-5xl px-6 py-8">
       <SearchBar
@@ -98,7 +163,12 @@ export default function ProjectsPage() {
           <EmptyState onClickCreate={() => setIsCreateOpen(true)} />
         )}
         {loadState === 'ready' && filtered.length > 0 && (
-          <ProjectsList projects={filtered} />
+          <ProjectsList 
+            projects={filtered}     
+            deletingProjectId={deletingProjectId}
+            openMenuProjectId={openMenuProjectId}
+            onOpenMenu={setOpenMenuProjectId}
+            onDeleteProject={handleDeleteProject}/>
         )}
       </div>
 
@@ -106,7 +176,10 @@ export default function ProjectsPage() {
         <Modal title="Create Project" onClose={() => setIsCreateOpen(false)}>
           {/* 你在 ProjectCreateForm 里只要在创建成功时调用 onCreated 即可 */}
           {/* <ProjectCreateForm onCreated={handleCreated} onCancel={() => setIsCreateOpen(false)} /> */}
-          <ProjectCreateForm/>
+          <ProjectCreateForm
+            onCreated={handleCreated}
+            onCancel={() => setIsCreateOpen(false)}
+          />
         </Modal>
       )}
     </div>
@@ -141,32 +214,100 @@ function SearchBar(props: {
 }
 
 /** ========== 分区 2：List 容器 + Row（封面 / 标题 / 描述 / 轻量信息） ========== */
-function ProjectsList({ projects }: { projects: Project[] }) {
+function ProjectsList(props: {
+  projects: Project[];
+  deletingProjectId: string | null;
+  openMenuProjectId: string | null;
+  onOpenMenu: (projectId: string | null) => void;
+  onDeleteProject: (projectId: string) => void;
+}) {
+  
   return (
     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-      {projects.map((p) => (
-        <ProjectCard key={p.id} project={p} />
+      {props.projects.map((p) => (
+        <ProjectCard
+          key={p.id}
+          project={p}
+          isDeleting={props.deletingProjectId === p.id}
+          menuOpen={props.openMenuProjectId === p.id}
+          onToggleMenu={() =>
+            props.onOpenMenu(props.openMenuProjectId === p.id ? null : p.id)
+          }
+          onCloseMenu={() => props.onOpenMenu(null)}
+          onDelete={() => props.onDeleteProject(p.id)}
+        />
       ))}
     </div>
   );
 }
 
+function ProjectCard(props: {
+  project: Project;
+  isDeleting: boolean;
+  menuOpen: boolean;
+  onToggleMenu: () => void;
+  onCloseMenu: () => void;
+  onDelete: () => void;
+}) {
+  const { project, isDeleting, menuOpen, onToggleMenu, onCloseMenu, onDelete } = props;
 
-function ProjectCard({ project }: { project: Project }) {
+
   return (
-    <a
-      href={`/projects/${project.id}`}
-      className="h-80 group overflow-hidden bg-white transition hover:shadow-md"
+    <div
+      className="group relative overflow-hidden rounded-xl border bg-white transition hover:shadow-md"
     >
-      <CoverThumb url={project.cover_image_url}/>
-      <div className="mt-1 truncate text-sm text-neutral-600">
-        {project.location || '-'}
-      </div>
-      
-      <div className="mt-0 line-clamp-3 text-sm leading-6 text-neutral-700 ">
-        {project.description || 'No description yet'}
-      </div>
-    </a>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          onToggleMenu();
+        }}
+        className="absolute right-3 top-3 z-10 hidden rounded-md bg-white/90 px-3 py-1 text-sm ring-1 ring-neutral-200 group-hover:block"
+      >
+        ⋮
+      </button>
+
+      {menuOpen && (
+        <div className="absolute right-3 top-12 z-20 w-40 rounded-xl border bg-white p-1 shadow-lg">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onCloseMenu();
+              onDelete();
+            }}
+            disabled={isDeleting}
+            className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+          >
+            {isDeleting ? "Deleting..." : "Delete project"}
+          </button>
+        </div>
+      )}
+
+      <a href={`/projects/${project.id}`} className="block">
+        <CoverThumb url={project.cover_image_url} />
+
+        <div className="p-4">
+          <div className="truncate text-base font-medium text-neutral-900">
+            {project.title || "Untitled Project"}
+          </div>
+
+          <div className="mt-1 truncate text-sm text-neutral-500">
+            {project.location || "-"}
+          </div>
+
+          <div className="mt-2 line-clamp-3 text-sm leading-6 text-neutral-700">
+            {project.description || "No description yet"}
+          </div>
+
+          <div className="mt-3 text-xs text-neutral-400">
+            {project.created_at ? formatDate(project.created_at) : "—"}
+          </div>
+        </div>
+      </a>
+    </div>
   );
 }
 
@@ -176,12 +317,13 @@ function CoverThumb({ url }: { url: string | null }) {
       <img
         src={url}
         alt="cover"
-        className="h-40 w-full shrink-0 object-cover transition group-hover:scale-[1.02]"
+        className="h-40 w-full shrink-0 object-cover"
       />
     );
   }
+
   return (
-    <div className="flex h-44 w-full shrink-0 items-center justify-center bg-neutural-100 text0sm text-neutral-500">
+    <div className="flex h-40 w-full shrink-0 items-center justify-center bg-neutral-100 text-sm text-neutral-500">
       No cover
     </div>
   );

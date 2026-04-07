@@ -1,3 +1,4 @@
+// TODO: Also add cover image to database. When deleting, also remove cover images not only from Bucket but also database.
 "use client";
 
 import React, { useState } from "react";
@@ -13,8 +14,21 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-
 import { createClient } from "@/utils/supabase/client";
+
+type Project = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  cover_image_url: string | null;
+  location: string | null;
+  created_at?: string;
+};
+
+type ProjectCreateFormProps = {
+  onCreated?: (project: Project) => void;
+  onCancel?: () => void;
+};
 
 const BUCKET = "designbase-assets";
 
@@ -29,7 +43,10 @@ function buildProjectCoverPath(params: { projectId: string; file: File }) {
   return `projects/${projectId}/cover/${safeName}`;
 }
 
-export function ProjectCreateForm() {
+export function ProjectCreateForm({
+  onCreated,
+  onCancel,
+}: ProjectCreateFormProps) {
   const router = useRouter();
   const supabase = createClient();
 
@@ -57,7 +74,7 @@ export function ProjectCreateForm() {
             status: status || null,
           },
         ])
-        .select("id")
+        .select("id, title, description, cover_image_url, location, created_at")
         .single();
 
       if (insertErr) throw insertErr;
@@ -88,7 +105,17 @@ export function ProjectCreateForm() {
       if (updateErr) throw updateErr;
 
       // 5) 跳到详情页验证闭环
-      router.push(`/projects/${projectId}`);
+      const newProject: Project = {
+        ...inserted,
+        cover_image_url: coverUrl,
+      };
+
+      if (onCreated) {
+        onCreated(newProject);
+      } else {
+        router.push(`/projects/${projectId}`);
+      }
+
     } catch (err: any) {
       console.error(err);
       alert(err?.message ?? "Upload failed");
@@ -143,9 +170,23 @@ export function ProjectCreateForm() {
           </div>
         </div>
 
-        <Button type="submit" className="w-full" disabled={submitting}>
-          {submitting ? "Submitting..." : "Submit"}
-        </Button>
+        <div className="flex gap-3">
+          {onCancel && (
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              onClick={onCancel}
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+          )}
+
+          <Button type="submit" className="flex-1" disabled={submitting}>
+            {submitting ? "Submitting..." : "Submit"}
+          </Button>
+        </div>
       </form>
     </div>
   );
