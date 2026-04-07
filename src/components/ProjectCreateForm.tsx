@@ -1,8 +1,10 @@
-// TODO: Also add cover image to database. When deleting, also remove cover images not only from Bucket but also database.
 "use client";
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+
+import { createClient } from "@/utils/supabase/client";
+
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -14,34 +16,38 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
-import { createClient } from "@/utils/supabase/client";
 
-type Project = {
+import {
+  ASSET_BUCKET,
+  buildAssetStoragePath,
+  uploadFileToStorage,
+  removeFilesFromStorage,
+  createAssetRow,
+} from "@/lib/assets";
+
+type ProjectListItem = {
   id: string;
   title: string | null;
   description: string | null;
-  cover_image_url: string | null;
   location: string | null;
-  created_at?: string;
+  created_at?: string | null;
+  cover_asset_id: string | null;
+  cover_thumb_url?: string | null;
 };
 
 type ProjectCreateFormProps = {
-  onCreated?: (project: Project) => void;
+  onCreated?: (project: ProjectListItem) => void;
   onCancel?: () => void;
 };
 
-const BUCKET = "designbase-assets";
-
-function buildProjectCoverPath(params: { projectId: string; file: File }) {
-  const { projectId, file } = params;
-
-  const safeName = file.name
-    .trim()
-    .replace(/\s+/g, "-")
-    .replace(/[^a-zA-Z0-9._-]/g, "");
-
-  return `projects/${projectId}/cover/${safeName}`;
-}
+type InsertedProject = {
+  id: string;
+  title: string | null;
+  description: string | null;
+  location: string | null;
+  created_at: string | null;
+  cover_asset_id: string | null;
+};
 
 export function ProjectCreateForm({
   onCreated,
@@ -52,91 +58,156 @@ export function ProjectCreateForm({
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [status, setStatus] = useState(""); // 你表里叫 status
+  const [status, setStatus] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  async function rollbackProject(projectId: string) {
+    try {
+      await supabase.from("projects").delete().eq("id", projectId);
+    } catch {
+      // ignore rollback failure for now
+    }
+  }
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (!imageFile) return alert("Please upload an image");
+
+    if (!title.trim()) {
+      alert("Please enter a project title.");
+      return;
+    }
+
+    if (!imageFile) {
+      alert("Please upload a cover image.");
+      return;
+    }
 
     setSubmitting(true);
 
+    let insertedProject: InsertedProject | null = null;
+    let uploadedStoragePath: string | null = null;
+
     try {
-      // 1) 先创建 project 拿到 projectId
-      // 如果你还没给 created_at 加 default now()，就需要手动传 created_at
-      const { data: inserted, error: insertErr } = await supabase
+      // 1) Create the project first
+      const { data: createdProject, error: createProjectError } = await supabase
         .from("projects")
         .insert([
           {
-            title,
-            description,
+            title: title.trim(),
+            description: description.trim() || null,
             status: status || null,
           },
         ])
-        .select("id, title, description, cover_image_url, location, created_at")
+        .select("id, title, description, location, created_at, cover_asset_id")
         .single();
 
-      if (insertErr) throw insertErr;
-      const projectId = inserted.id as string;
+      if (createProjectError) {
+        throw createProjectError;
+      }
 
-      // 2) 上传封面图到标准路径
-      const path = buildProjectCoverPath({ projectId, file: imageFile });
+      insertedProject = createdProject as InsertedProject;
 
-      const { error: uploadErr } = await supabase.storage
-        .from(BUCKET)
-        .upload(path, imageFile, {
-          upsert: false,
-          contentType: imageFile.type,
-        });
+      // 2) Upload cover file to storage
+      const storagePath = buildAssetStoragePath({
+        projectId: insertedProject.id,
+        fileName: imageFile.name,
+        kind: "cover",
+      });
 
-      if (uploadErr) throw uploadErr;
+      const uploaded = await uploadFileToStorage({
+        supabase,
+        bucket: ASSET_BUCKET,
+        storagePath,
+        file: imageFile,
+      });
 
-      // 3) 生成 public URL
-      const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(path);
-      const coverUrl = urlData.publicUrl;
+      uploadedStoragePath = uploaded.storagePath;
 
-      // 4) 回写 projects.cover_image_url
-      const { error: updateErr } = await supabase
+      // 3) Insert a matching asset row
+      const coverAsset = await createAssetRow({
+        supabase,
+        projectId: insertedProject.id,
+        file: imageFile,
+        storagePath: uploaded.storagePath,
+        thumbUrl: uploaded.publicUrl,
+        notes: "Project cover",
+      });
+
+      // 4) Point the project to this cover asset
+      const { error: updateProjectError } = await supabase
         .from("projects")
-        .update({ cover_image_url: coverUrl })
-        .eq("id", projectId);
+        .update({
+          cover_asset_id: coverAsset.id,
+        })
+        .eq("id", insertedProject.id);
 
-      if (updateErr) throw updateErr;
+      if (updateProjectError) {
+        throw updateProjectError;
+      }
 
-      // 5) 跳到详情页验证闭环
-      const newProject: Project = {
-        ...inserted,
-        cover_image_url: coverUrl,
+      // 5) Return a list-friendly object
+      const newProject: ProjectListItem = {
+        id: insertedProject.id,
+        title: insertedProject.title,
+        description: insertedProject.description,
+        location: insertedProject.location,
+        created_at: insertedProject.created_at,
+        cover_asset_id: coverAsset.id,
+        cover_thumb_url: coverAsset.thumb_url,
       };
 
       if (onCreated) {
         onCreated(newProject);
       } else {
-        router.push(`/projects/${projectId}`);
+        router.push(`/projects/${insertedProject.id}`);
       }
-
     } catch (err: any) {
       console.error(err);
-      alert(err?.message ?? "Upload failed");
+
+      // rollback storage file if it was uploaded
+      if (uploadedStoragePath) {
+        try {
+          await removeFilesFromStorage({
+            supabase,
+            bucket: ASSET_BUCKET,
+            paths: [uploadedStoragePath],
+          });
+        } catch (storageRollbackError) {
+          console.error("Storage rollback failed:", storageRollbackError);
+        }
+      }
+
+      // rollback created project if it exists
+      if (insertedProject?.id) {
+        await rollbackProject(insertedProject.id);
+      }
+
+      alert(err?.message ?? "Create project failed.");
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="max-w-xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-bold">Upload New Project</h1>
+    <div className="mx-auto max-w-xl space-y-6 p-6">
+      <h1 className="text-2xl font-bold">Create New Project</h1>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <Label>Project Title</Label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} required />
+          <Label htmlFor="project-title">Project Title</Label>
+          <Input
+            id="project-title"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+          />
         </div>
 
         <div>
-          <Label>Description</Label>
+          <Label htmlFor="project-description">Description</Label>
           <Textarea
+            id="project-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             required
@@ -145,7 +216,7 @@ export function ProjectCreateForm({
 
         <div>
           <Label>Status</Label>
-          <Select onValueChange={setStatus}>
+          <Select value={status} onValueChange={setStatus}>
             <SelectTrigger>
               <SelectValue placeholder="Select status" />
             </SelectTrigger>
@@ -159,14 +230,15 @@ export function ProjectCreateForm({
         </div>
 
         <div>
-          <Label>Upload Cover Image</Label>
+          <Label htmlFor="cover-upload">Upload Cover Image</Label>
           <Input
+            id="cover-upload"
             type="file"
             accept="image/*"
             onChange={(e) => setImageFile(e.target.files?.[0] || null)}
           />
           <div className="mt-1 text-xs text-muted-foreground">
-            Storage path: {BUCKET}/projects/&lt;projectId&gt;/cover/&lt;filename&gt;
+            Bucket path pattern: {ASSET_BUCKET}/projects/&lt;projectId&gt;/cover/&lt;filename&gt;
           </div>
         </div>
 
@@ -183,7 +255,11 @@ export function ProjectCreateForm({
             </Button>
           )}
 
-          <Button type="submit" className="flex-1" disabled={submitting}>
+          <Button
+            type="submit"
+            className="flex-1"
+            disabled={submitting}
+          >
             {submitting ? "Submitting..." : "Submit"}
           </Button>
         </div>

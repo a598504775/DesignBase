@@ -5,12 +5,13 @@ import { ProjectCreateForm } from '@/components/ProjectCreateForm';
 import { createClient } from "@/utils/supabase/client";
 
 type Project = {
-  id: string,
-  title: string | null,
-  description: string | null,
-  cover_image_url: string | null,
-  location: string | null,
-  created_at?: string,
+  id: string;
+  title: string | null;
+  description: string | null;
+  location: string | null;
+  created_at?: string | null;
+  cover_asset_id: string | null;
+  cover_thumb_url?: string | null;
 };
 
 type LoadState = 'idle' | 'loading' | 'error' | 'ready';
@@ -29,7 +30,7 @@ export default function ProjectsPage() {
     window.addEventListener("click", handleGlobalClick);
     return () => window.removeEventListener("click", handleGlobalClick);
   }, []);
-  
+
   // 1) Toolbar state
   const [query, setQuery] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -287,7 +288,7 @@ function ProjectCard(props: {
       )}
 
       <a href={`/projects/${project.id}`} className="block">
-        <CoverThumb url={project.cover_image_url} />
+        <CoverThumb url={project.cover_thumb_url ?? null} />
 
         <div className="p-4">
           <div className="truncate text-base font-medium text-neutral-900">

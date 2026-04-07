@@ -130,6 +130,9 @@ export default function UploadAssetsModal ({open, onClose, projectId, onUpdated}
             setProgreeText(null);
             setPending([]);
             setErrorMsg(null);
+
+            onUpdated?.();
+            onClose();
         }
         catch (e: any){
             setErrorMsg(e?.message ?? "Upload faild");

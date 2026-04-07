@@ -14,7 +14,7 @@ type DbProject = {
   id: string;
   title: string | null;
   description: string | null;
-  cover_image_url: string | null;
+  cover_asset_id: string | null;
   created_at: string;
 };
 
@@ -47,6 +47,10 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
   const [deleting, setDeleting] = useState(false);
   const isSelectionMode = selectedAssetIds.length > 0;
 
+  const coverAsset = useMemo(() => {
+  if (!project?.cover_asset_id) return null;
+  return assets.find((a) => a.id === project.cover_asset_id) ?? null;
+}, [project, assets]);
 
   function toggleAssetSelected(assetId: string) {
     setSelectedAssetIds((prev) =>
@@ -106,7 +110,7 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
     try {
       const p = await supabase
         .from("projects")
-        .select("id,title,description,cover_image_url,created_at")
+        .select("id,title,description,cover_asset_id,created_at")
         .eq("id", projectId)
         .single();
 
@@ -178,7 +182,7 @@ useEffect(() => {
     return (
       <div className="mx-auto max-w-5xl p-6">
         <div className="rounded-xl border p-4">
-          <div className="text-lg font-semibold">项目不存在</div>
+          <div className="text-lg font-semibold">Project doesn't exist</div>
           <div className="mt-4">
             <Link className="underline" href="/projects">
               Return to the project list
@@ -245,9 +249,9 @@ useEffect(() => {
       {/* Cover */}
       <div className="mt-5 overflow-hidden rounded-2xl border">
         <div className="relative h-44 w-full bg-muted sm:h-56">
-          {project.cover_image_url ? (
+          {coverAsset?.thumb_url ? (
             <Image
-              src={project.cover_image_url}
+              src={coverAsset.thumb_url}
               alt="Project cover"
               fill
               className="object-cover"
