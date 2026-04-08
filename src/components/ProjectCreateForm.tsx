@@ -65,12 +65,13 @@ export function ProjectCreateForm({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [projectType, setProjectType] = useState("");
+  const [location, setLocation] = useState("");
 
   async function rollbackProject(projectId: string) {
     try {
       await supabase.from("projects").delete().eq("id", projectId);
     } catch {
-      // ignore rollback failure for now
+      // Ignore rollback failure for now.
     }
   }
 
@@ -93,7 +94,6 @@ export function ProjectCreateForm({
     let uploadedStoragePath: string | null = null;
 
     try {
-      // 1) Create the project first
       const { data: createdProject, error: createProjectError } = await supabase
         .from("projects")
         .insert([
@@ -102,9 +102,12 @@ export function ProjectCreateForm({
             description: description.trim() || null,
             status: status || null,
             project_type: projectType || null,
+            location: location.trim() || null,
           },
         ])
-        .select("id, title, description, location, created_at, cover_asset_id, project_type")
+        .select(
+          "id, title, description, location, created_at, cover_asset_id, project_type"
+        )
         .single();
 
       if (createProjectError) {
@@ -113,7 +116,6 @@ export function ProjectCreateForm({
 
       insertedProject = createdProject as InsertedProject;
 
-      // 2) Upload cover file to storage
       const storagePath = buildAssetStoragePath({
         projectId: insertedProject.id,
         fileName: imageFile.name,
@@ -129,7 +131,6 @@ export function ProjectCreateForm({
 
       uploadedStoragePath = uploaded.storagePath;
 
-      // 3) Insert a matching asset row
       const coverAsset = await createAssetRow({
         supabase,
         projectId: insertedProject.id,
@@ -140,7 +141,6 @@ export function ProjectCreateForm({
         assetType: "Image",
       });
 
-      // 4) Point the project to this cover asset
       const { error: updateProjectError } = await supabase
         .from("projects")
         .update({
@@ -152,7 +152,6 @@ export function ProjectCreateForm({
         throw updateProjectError;
       }
 
-      // 5) Return a list-friendly object
       const newProject: ProjectListItem = {
         id: insertedProject.id,
         title: insertedProject.title,
@@ -172,7 +171,6 @@ export function ProjectCreateForm({
     } catch (err: any) {
       console.error(err);
 
-      // rollback storage file if it was uploaded
       if (uploadedStoragePath) {
         try {
           await removeFilesFromStorage({
@@ -185,7 +183,6 @@ export function ProjectCreateForm({
         }
       }
 
-      // rollback created project if it exists
       if (insertedProject?.id) {
         await rollbackProject(insertedProject.id);
       }
@@ -197,50 +194,60 @@ export function ProjectCreateForm({
   };
 
   return (
-    <div className="mx-auto max-w-xl space-y-6 p-6">
-      <h1 className="text-2xl font-bold">Create New Project</h1>
-
+    <div className="mx-auto w-full max-w-2xl">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <Label htmlFor="project-title">Project Title</Label>
+        {/* Title */}
+        <div className="space-y-1.5">
+          <Label htmlFor="project-title" className="text-sm text-neutral-700">
+            Project Title
+          </Label>
           <Input
             id="project-title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             required
+            className="h-10 rounded-[12px] border-neutral-300"
+            placeholder="Enter project title"
           />
         </div>
 
-        <div>
-          <Label>Project Type</Label>
-          <Select value={projectType} onValueChange={setProjectType}>
-            <SelectTrigger>
-              <SelectValue placeholder="Select project type" />
-            </SelectTrigger>
-            <SelectContent>
-              {PROJECT_TYPES.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+        {/* Type and location */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label className="text-sm text-neutral-700">Project Type</Label>
+            <Select value={projectType} onValueChange={setProjectType}>
+              <SelectTrigger className="h-10 rounded-[12px] border-neutral-300">
+                <SelectValue placeholder="Select project type" />
+              </SelectTrigger>
+              <SelectContent>
+                {PROJECT_TYPES.map((type) => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="project-location" className="text-sm text-neutral-700">
+              Location
+            </Label>
+            <Input
+              id="project-location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="e.g. Los Angeles, CA"
+              className="h-10 rounded-[12px] border-neutral-300"
+            />
+          </div>
         </div>
 
-        <div>
-          <Label htmlFor="project-description">Description</Label>
-          <Textarea
-            id="project-description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            required
-          />
-        </div>
-
-        <div>
-          <Label>Status</Label>
+        {/* Status */}
+        <div className="space-y-1.5">
+          <Label className="text-sm text-neutral-700">Status</Label>
           <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger>
+            <SelectTrigger className="h-10 rounded-[12px] border-neutral-300">
               <SelectValue placeholder="Select status" />
             </SelectTrigger>
             <SelectContent>
@@ -252,27 +259,57 @@ export function ProjectCreateForm({
           </Select>
         </div>
 
-        <div>
-          <Label htmlFor="cover-upload">Upload Cover Image</Label>
-          <Input
-            id="cover-upload"
-            type="file"
-            accept="image/*"
-            onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+        {/* Description */}
+        <div className="space-y-1.5">
+          <Label htmlFor="project-description" className="text-sm text-neutral-700">
+            Description
+          </Label>
+          <Textarea
+            id="project-description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            required
+            placeholder="Write a short description of the project"
+            className="min-h-[112px] rounded-[14px] border-neutral-300 resize-none"
           />
-          <div className="mt-1 text-xs text-muted-foreground">
-            Bucket path pattern: {ASSET_BUCKET}/projects/&lt;projectId&gt;/cover/&lt;filename&gt;
+        </div>
+
+        {/* Cover image */}
+        <div className="space-y-1.5">
+          <Label htmlFor="cover-upload" className="text-sm text-neutral-700">
+            Cover Image
+          </Label>
+
+          <div className="rounded-[14px] border border-dashed border-neutral-300 bg-neutral-50 px-4 py-3">
+            <Input
+              id="cover-upload"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setImageFile(e.target.files?.[0] || null)}
+              className="h-10 rounded-[12px] border-neutral-300 bg-white"
+            />
+
+            <div className="mt-2 text-xs text-neutral-500">
+              Bucket path pattern: {ASSET_BUCKET}/projects/&lt;projectId&gt;/cover/&lt;filename&gt;
+            </div>
+
+            {imageFile && (
+              <div className="mt-2 text-sm text-neutral-700">
+                Selected file: <span className="font-medium">{imageFile.name}</span>
+              </div>
+            )}
           </div>
         </div>
 
-        <div className="flex gap-3">
+        {/* Footer actions */}
+        <div className="flex items-center justify-end gap-3 border-t border-neutral-200 pt-4">
           {onCancel && (
             <Button
               type="button"
               variant="outline"
-              className="flex-1"
               onClick={onCancel}
               disabled={submitting}
+              className="h-10 rounded-[12px] border-neutral-300 px-5"
             >
               Cancel
             </Button>
@@ -280,10 +317,10 @@ export function ProjectCreateForm({
 
           <Button
             type="submit"
-            className="flex-1"
             disabled={submitting}
+            className="h-10 rounded-[12px] border border-[#69c98e] bg-[#8fdbab] px-5 text-black hover:brightness-95"
           >
-            {submitting ? "Submitting..." : "Submit"}
+            {submitting ? "Submitting..." : "Create Project"}
           </Button>
         </div>
       </form>
