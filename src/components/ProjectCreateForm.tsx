@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { PROJECT_TYPES } from "@/lib/classifications";
 import {
   Select,
   SelectTrigger,
@@ -32,7 +33,8 @@ type ProjectListItem = {
   location: string | null;
   created_at?: string | null;
   cover_asset_id: string | null;
-  cover_thumb_url?: string | null;
+  cover_thumb_url: string | null;
+  project_type: string | null;
 };
 
 type ProjectCreateFormProps = {
@@ -47,6 +49,7 @@ type InsertedProject = {
   location: string | null;
   created_at: string | null;
   cover_asset_id: string | null;
+  project_type: string | null;
 };
 
 export function ProjectCreateForm({
@@ -61,6 +64,7 @@ export function ProjectCreateForm({
   const [status, setStatus] = useState("");
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [projectType, setProjectType] = useState("");
 
   async function rollbackProject(projectId: string) {
     try {
@@ -97,9 +101,10 @@ export function ProjectCreateForm({
             title: title.trim(),
             description: description.trim() || null,
             status: status || null,
+            project_type: projectType || null,
           },
         ])
-        .select("id, title, description, location, created_at, cover_asset_id")
+        .select("id, title, description, location, created_at, cover_asset_id, project_type")
         .single();
 
       if (createProjectError) {
@@ -132,6 +137,7 @@ export function ProjectCreateForm({
         storagePath: uploaded.storagePath,
         thumbUrl: uploaded.publicUrl,
         notes: "Project cover",
+        assetType: "Image",
       });
 
       // 4) Point the project to this cover asset
@@ -155,6 +161,7 @@ export function ProjectCreateForm({
         created_at: insertedProject.created_at,
         cover_asset_id: coverAsset.id,
         cover_thumb_url: coverAsset.thumb_url,
+        project_type: insertedProject.project_type,
       };
 
       if (onCreated) {
@@ -202,6 +209,22 @@ export function ProjectCreateForm({
             onChange={(e) => setTitle(e.target.value)}
             required
           />
+        </div>
+
+        <div>
+          <Label>Project Type</Label>
+          <Select value={projectType} onValueChange={setProjectType}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select project type" />
+            </SelectTrigger>
+            <SelectContent>
+              {PROJECT_TYPES.map((type) => (
+                <SelectItem key={type} value={type}>
+                  {type}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div>

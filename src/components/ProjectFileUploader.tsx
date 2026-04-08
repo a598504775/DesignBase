@@ -41,7 +41,7 @@ export default function ProjectFileUploader({ projectId }: Props) {
 
       if (dbError) throw dbError;
 
-      alert('上传成功');
+      alert('Upload successful');
     } catch (e: unknown) {
       console.error(e);
       const msg =
@@ -56,7 +56,7 @@ export default function ProjectFileUploader({ projectId }: Props) {
   return (
     <div className="space-y-2">
       <input type="file" onChange={handleUpload} disabled={uploading} />
-      {uploading && <p>正在上传…</p>}
+      {uploading && <p>Uploading…</p>}
       {error && <p className="text-red-500 text-sm">{error}</p>}
     </div>
   );

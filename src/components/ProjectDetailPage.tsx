@@ -26,12 +26,28 @@ type DbAsset = {
   thumb_url: string | null;
   created_at: string;
   storage_path: string | null;
+  asset_type: string | null;
 };
 
 function formatDate(iso: string) {
   const d = new Date(iso);
   return isNaN(d.getTime()) ? iso : d.toLocaleString();
 }
+
+const ASSET_TYPE_ORDER = [
+  "Image",
+  "PDF",
+  "Document",
+  "Presentation",
+  "Spreadsheet",
+  "CAD",
+  "BIM",
+  "3D Model",
+  "Video",
+  "Archive",
+  "Other",
+  "Uncategorized",
+];
 
 export default function ProjectDetailPage({ projectId }: { projectId: string }) {
   const supabase = useMemo(() => createClient(), []);
@@ -48,9 +64,9 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
   const isSelectionMode = selectedAssetIds.length > 0;
 
   const coverAsset = useMemo(() => {
-  if (!project?.cover_asset_id) return null;
-  return assets.find((a) => a.id === project.cover_asset_id) ?? null;
-}, [project, assets]);
+    if (!project?.cover_asset_id) return null;
+    return assets.find((a) => a.id === project.cover_asset_id) ?? null;
+  }, [project, assets]);
 
   function toggleAssetSelected(assetId: string) {
     setSelectedAssetIds((prev) =>
@@ -118,7 +134,7 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
 
       const a = await supabase
         .from("assets")
-        .select("id,project_id,file_name,notes,thumb_url,created_at,storage_path")
+        .select("id,project_id,file_name,notes,thumb_url,created_at,storage_path,asset_type")
         .eq("project_id", projectId)
         .order("created_at", { ascending: false });
 
@@ -147,6 +163,31 @@ useEffect(() => {
       return t.includes(q) || d.includes(q);
     });
   }, [assets, query]);
+
+  // Learn from this
+  const groupedAssets = useMemo(() => {
+    const groups = new Map<string, DbAsset[]>();
+
+    for (const asset of filteredAssets) {
+      const key = asset.asset_type?.trim() || "Uncategorized";
+
+      if (!groups.has(key)) {
+        groups.set(key, []);
+      }
+
+      groups.get(key)!.push(asset);
+    }
+
+    return Array.from(groups.entries()).sort(([a], [b]) => {
+      const ai = ASSET_TYPE_ORDER.indexOf(a);
+      const bi = ASSET_TYPE_ORDER.indexOf(b);
+
+      const safeAi = ai === -1 ? Number.MAX_SAFE_INTEGER : ai;
+      const safeBi = bi === -1 ? Number.MAX_SAFE_INTEGER : bi;
+
+      return safeAi - safeBi || a.localeCompare(b);
+    });
+  }, [filteredAssets]);
 
   if (loading) {
     return (
@@ -292,61 +333,86 @@ useEffect(() => {
               No asset.
             </div>
           ) : (
-            <div className="divide-y rounded-2xl border">
-              {filteredAssets.map((a) => (
-              <div
-                key={a.id}
-                className="flex gap-4 p-4 hover:bg-muted/40"
-                onMouseEnter={() => setHoveredAssetId(a.id)}
-                onMouseLeave={() => setHoveredAssetId((prev) => (prev === a.id ? null : prev))}
-              >
-                <div className="w-5 shrink-0 pt-1">
-                  {(isSelectionMode || hoveredAssetId === a.id) && (
-                    <input
-                      type="checkbox"
-                      checked={selectedAssetIds.includes(a.id)}
-                      onChange={() => toggleAssetSelected(a.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      disabled={deleting}
-                    />
-                  )}
-                </div>
-
-                <Link href={`/assets/${a.id}`} className="flex flex-1 gap-4 min-w-0">
-                  <div className="relative h-16 w-20 overflow-hidden rounded-lg bg-muted sm:h-20 sm:w-28">
-                    {a.thumb_url ? (
-                      <Image
-                        src={a.thumb_url}
-                        alt="Asset thumb"
-                        fill
-                        className="object-cover"
-                        sizes="112px"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
-                        No thumb
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="truncate font-medium">
-                          {a.file_name ?? "Untitled Asset"}
-                        </div>
-                        <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                          {a.notes ?? "No description"}
-                        </div>
-                      </div>
-
-                      <div className="shrink-0 text-xs text-muted-foreground">
-                        {formatDate(a.created_at)}
-                      </div>
+            <div className="space-y-6">
+              {groupedAssets.map(([groupName, groupAssets]) => (
+                <div key={groupName} className="rounded-2xl border">
+                  <div className="flex items-center justify-between border-b bg-muted/30 px-4 py-3">
+                    <div className="text-sm font-semibold">{groupName}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {groupAssets.length}
                     </div>
                   </div>
-                </Link>
-              </div>
+
+                  <div className="divide-y">
+                    {groupAssets.map((a) => (
+                      <div
+                        key={a.id}
+                        className="flex gap-4 p-4 hover:bg-muted/40"
+                        onMouseEnter={() => setHoveredAssetId(a.id)}
+                        onMouseLeave={() =>
+                          setHoveredAssetId((prev) => (prev === a.id ? null : prev))
+                        }
+                      >
+                        <div className="w-5 shrink-0 pt-1">
+                          {(isSelectionMode || hoveredAssetId === a.id) && (
+                            <input
+                              type="checkbox"
+                              checked={selectedAssetIds.includes(a.id)}
+                              onChange={() => toggleAssetSelected(a.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              disabled={deleting}
+                            />
+                          )}
+                        </div>
+
+                        <Link
+                          href={`/assets/${a.id}`}
+                          className="flex min-w-0 flex-1 gap-4"
+                        >
+                          <div className="relative h-16 w-20 overflow-hidden rounded-lg bg-muted sm:h-20 sm:w-28">
+                            {a.thumb_url ? (
+                              <Image
+                                src={a.thumb_url}
+                                alt="Asset thumb"
+                                fill
+                                className="object-cover"
+                                sizes="112px"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                                No thumb
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="truncate font-medium">
+                                  {a.file_name ?? "Untitled Asset"}
+                                </div>
+
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                  <span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">
+                                    {a.asset_type ?? "Uncategorized"}
+                                  </span>
+                                </div>
+
+                                <div className="mt-2 line-clamp-2 text-sm text-muted-foreground">
+                                  {a.notes ?? "No description"}
+                                </div>
+                              </div>
+
+                              <div className="shrink-0 text-xs text-muted-foreground">
+                                {formatDate(a.created_at)}
+                              </div>
+                            </div>
+                          </div>
+                        </Link>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
           )}

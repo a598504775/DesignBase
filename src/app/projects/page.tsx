@@ -11,7 +11,8 @@ type Project = {
   location: string | null;
   created_at?: string | null;
   cover_asset_id: string | null;
-  cover_thumb_url?: string | null;
+  project_type: string | null;
+  cover_thumb_url: string | null;
 };
 
 type LoadState = 'idle' | 'loading' | 'error' | 'ready';
@@ -19,6 +20,8 @@ type LoadState = 'idle' | 'loading' | 'error' | 'ready';
 
 export default function ProjectsPage() {
   const supabase = createClient();
+
+  
 
   // Control the visibility of dot icon of project tiles
   const [openMenuProjectId, setOpenMenuProjectId] = useState<string | null>(null);
@@ -40,7 +43,7 @@ export default function ProjectsPage() {
   const [loadState, setLoadState] = useState<LoadState>('idle');
   const [errorMsg, setErrorMsg] = useState<string>('');
 
-  // 3) Fetch (先做最小可运行：你接 Supabase 时把这里替换掉)
+  // 3) Fetch
   useEffect(() => {
     let cancelled = false;
 
@@ -49,16 +52,39 @@ export default function ProjectsPage() {
         setLoadState('loading');
         setErrorMsg('');
 
-        // TODO: 接 Supabase 时，把下面这段替换成真实 fetch
-        // const { data, error } = await supabase.from('projects').select('*').order('updated_at', { ascending: false });
-        // if (error) throw error;
-        // if (!cancelled) setProjects(data ?? []);
+        const {data: projectRows, error: projectError} = await supabase
+          .from("projects")
+          .select("id,title,description,location,created_at,cover_asset_id,project_type")
+          .order("created_at", {ascending: false});
+        
+        if (projectError) throw projectError;
+        
 
-        const { data, error } = await supabase.from('projects').select('*').order('created_at', {ascending: false});
-        if (error) throw error;
+
+        const coverIds = (projectRows ?? [])
+          .map((p) => p.cover_asset_id)
+          .filter((id): id is string => Boolean(id));
+
+        const {data: assetRows, error: assetError} = await supabase
+          .from("assets")
+          .select("id, thumb_url")
+          .in("id", coverIds);
+
+        if (assetError) throw assetError;
+
+        let coverMap = new Map<string, string | null>();
+
+        (assetRows ?? []).forEach((p) => {coverMap.set(p.id, p.thumb_url)});
+
+        const normalizedProjects : Project[] = (projectRows ?? []).map((p) => ({...p, cover_thumb_url: p.cover_asset_id ? 
+          coverMap.get(p.cover_asset_id) ?? null :
+          null,
+        }));
+
+        setProjects(normalizedProjects);
 
         if (!cancelled) {
-          setProjects(data ?? []);
+          setProjects(normalizedProjects ?? []);
           setLoadState('ready');
         }
       } catch (e: any) {

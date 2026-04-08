@@ -2,6 +2,13 @@
 
 import { useMemo, useState, useRef, InputHTMLAttributes } from "react";
 import { createClient } from "@/utils/supabase/client";
+import {
+  ASSET_BUCKET,
+  buildAssetStoragePath,
+  uploadFileToStorage,
+  createAssetRow,
+  inferAssetType,
+} from "@/lib/assets";
 
 type Props = {
     open : boolean,
@@ -47,7 +54,6 @@ export default function UploadAssetsModal ({open, onClose, projectId, onUpdated}
     const [progressText, setProgreeText] = useState<string | null>(null);
     const fileCount = useMemo(() => {return pending.length},[pending])
 
-    const BUCKET = "designbase-assets";
     const supabase = createClient();
 
     function onClickAdd() {
@@ -102,8 +108,30 @@ export default function UploadAssetsModal ({open, onClose, projectId, onUpdated}
                 const day = String(now.getDate()).padStart(2, "0");
                 const date = `${year}-${month}-${day}`;
 
-                const fileKey = `${projectId}/${date}_${crypto.randomUUID()}_${safeName(f.name)}`;
+                // const fileKey = `${projectId}/${date}_${crypto.randomUUID()}_${safeName(f.name)}`;
 
+                const storagePath = buildAssetStoragePath({
+                    projectId,
+                    fileName: `${date}_${crypto.randomUUID()}_${f.name}`,
+                    kind: "asset",
+                });
+
+                const uploaded = await uploadFileToStorage({
+                supabase,
+                bucket: ASSET_BUCKET,
+                storagePath,
+                file: f,
+                });
+                
+                await createAssetRow({
+                    supabase,
+                    projectId,
+                    file: f,
+                    storagePath: uploaded.storagePath,
+                    thumbUrl: isImage(f.name) ? uploaded.publicUrl : null,
+                    assetType: inferAssetType(f.name),
+                });
+                /*
                 const up = await supabase.storage.from(BUCKET).upload(fileKey, f, {upsert: false, cacheControl: "3600",});
 
                 if (up.error) throw(up.error);
@@ -126,6 +154,7 @@ export default function UploadAssetsModal ({open, onClose, projectId, onUpdated}
                 });
 
                 if (ins.error) throw ins.error;
+                */
             }
             setProgreeText(null);
             setPending([]);
@@ -172,7 +201,7 @@ export default function UploadAssetsModal ({open, onClose, projectId, onUpdated}
                         (<div className="p-6 text-sm text-muted-foreground">No files added yet. Click <span className="font-medium">“Add”</span> to select files.</div>) : (
                             pending.map((p) => {
                                 return (
-                                    <div className="flex items-center gap-3 px-4 py-3">
+                                    <div key={p.id} className="flex items-center gap-3 px-4 py-3">
                                         <input type="checkbox" checked={p.selected} disabled={submitting} onChange={() => toggleSelected(p.id)}/>
                                         <div className="min-w-0 flex-1">
                                             <div className="truncate text-sm font-medium">
