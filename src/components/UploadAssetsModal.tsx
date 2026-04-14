@@ -9,6 +9,7 @@ import {
   createAssetRow,
   inferAssetType,
 } from "@/lib/assets";
+import { createImageContentUnit } from "@/lib/contentUnits";
 
 type Props = {
   open: boolean;
@@ -139,7 +140,7 @@ export default function UploadAssetsModal({
           file: f,
         });
 
-        await createAssetRow({
+        const assetRow = await createAssetRow({
           supabase,
           projectId,
           file: f,
@@ -147,6 +148,29 @@ export default function UploadAssetsModal({
           thumbUrl: isImage(f.name) ? uploaded.publicUrl : null,
           assetType: inferAssetType(f.name),
         });
+
+        if (assetRow.asset_type === "Image") {
+            await createImageContentUnit({
+                supabase,
+                asset: assetRow
+            })
+        }
+
+        if (assetRow.asset_type === "PDF") {
+            fetch("/api/ingest/pdf", {
+                method: "POST",
+                headers: {
+                "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                assetId: assetRow.id,
+                projectId: assetRow.project_id,
+                storagePath: assetRow.storage_path,
+                }),
+            }).catch((err) => {
+                console.error("PDF ingestion failed:", err);
+            });
+        }
       }
 
       setProgressText(null);

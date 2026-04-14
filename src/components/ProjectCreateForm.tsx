@@ -17,6 +17,7 @@ import {
   SelectContent,
   SelectItem,
 } from "@/components/ui/select";
+import { createImageContentUnit } from "@/lib/contentUnits"
 
 import {
   ASSET_BUCKET,
@@ -140,6 +141,10 @@ export function ProjectCreateForm({
         notes: "Project cover",
         assetType: "Image",
       });
+
+      if (coverAsset.asset_type === "Image") {
+         await createImageContentUnit({supabase, asset: coverAsset});
+      }
 
       const { error: updateProjectError } = await supabase
         .from("projects")

@@ -3,6 +3,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ProjectCreateForm } from '@/components/ProjectCreateForm';
 import { createClient } from '@/utils/supabase/client';
+import { ContentUnitSearchRow, searchContentUnits } from '@/lib/searchContentUnits'
+import {
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+} from "@/components/ui/select";
+import Link from "next/link";
+import { AssetSearchRow, searchAssets } from '@/lib/searchAssets';
 
 type Project = {
   id: string;
@@ -16,9 +26,10 @@ type Project = {
 };
 
 type LoadState = 'idle' | 'loading' | 'error' | 'ready';
+type SearchTab = "projects" | "assets" | "contents";
 
 export default function ProjectsPage() {
-  const supabase = createClient();
+  const supabase = useMemo(() => createClient(), []);
 
   // State for project tile action menu
   const [openMenuProjectId, setOpenMenuProjectId] = useState<string | null>(null);
@@ -35,6 +46,18 @@ export default function ProjectsPage() {
   // State for delete progress
   const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null);
 
+  // Content level search related states
+  const [searchTab, setSearchTab] = useState<SearchTab>("projects");
+  const [contentResults, setContentResults] = useState<ContentUnitSearchRow[]>([]);
+  const [searchingContents, setSearchingContents] = useState(false);
+
+  // Display all projects or search results
+  const hasQuery = query.trim().length > 0;
+
+  // Display asset search results
+  const [assetResults, setAssetResults] = useState<AssetSearchRow[]>([]);
+  const [searchingAssets, setSearchingAssets] = useState(false);
+
   // Close project menu when clicking outside
   useEffect(() => {
     function handleGlobalClick() {
@@ -46,6 +69,7 @@ export default function ProjectsPage() {
   }, []);
 
   // Load projects and resolve cover thumbnail URLs
+  
   useEffect(() => {
     let cancelled = false;
 
@@ -106,7 +130,7 @@ export default function ProjectsPage() {
     };
   }, [supabase]);
 
-  // Local search filter
+  // Search function: Project level
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return projects;
@@ -125,6 +149,177 @@ export default function ProjectsPage() {
       );
     });
   }, [projects, query]);
+
+
+  // Search function: Asset level
+  useEffect(() => {
+    if (searchTab !== "assets" || !query.trim()) {
+      setSearchingAssets(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function run() {
+      try {
+        setSearchingAssets(true);
+
+        const rows = await searchAssets({
+          supabase,
+          query,
+        });
+
+        if (!cancelled) {
+          setAssetResults(rows);
+        }
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) {
+          setAssetResults([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setSearchingAssets(false);
+        }
+      }
+    }
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchTab, query, supabase]);
+
+
+  // Search function: Content level
+  const trimmedQuery = query.trim();
+
+  useEffect(() => {
+    if (searchTab !== "contents" || !trimmedQuery) {
+      setSearchingContents(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function runContentSearch() {
+      try {
+        setSearchingContents(true);
+
+        const rows = await searchContentUnits({
+          supabase,
+          query: trimmedQuery,
+          limit: 24,
+        });
+
+        if (!cancelled) {
+          setContentResults(rows);
+        }
+      } catch (e) {
+        console.error(e);
+        if (!cancelled) {
+          setContentResults([]);
+        }
+      } finally {
+        if (!cancelled) {
+          setSearchingContents(false);
+        }
+      }
+    }
+
+    runContentSearch();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchTab, trimmedQuery, supabase]);
+
+  //Group asset results
+
+  const groupedAssetResults = useMemo(() => {
+    const projectMap = new Map<
+      string,
+      {
+        projectId: string;
+        projectTitle: string;
+        rows: AssetSearchRow[];
+      }
+    >();
+
+    for (const row of assetResults) {
+      const projectId = row.project_id;
+      const projectTitle = row.project_title ?? "Untitled Project";
+
+      if (!projectMap.has(projectId)) {
+        projectMap.set(projectId, {
+          projectId,
+          projectTitle,
+          rows: [],
+        });
+      }
+
+      projectMap.get(projectId)!.rows.push(row);
+    }
+
+    return Array.from(projectMap.values());
+  }, [assetResults]);
+
+  // Group content results
+  const groupedContentResults = useMemo(() => {
+    const projectMap = new Map<
+      string,
+      {
+        projectId: string;
+        projectTitle: string;
+        assets: Map<
+          string,
+          {
+            assetId: string;
+            assetFileName: string;
+            rows: ContentUnitSearchRow[];
+          }
+        >;
+      }
+    >();
+
+    for (const row of contentResults) {
+      const projectId = row.project_id;
+      const projectTitle = row.project_title ?? "Untitled Project";
+      const assetId = row.asset_id;
+      const assetFileName = row.asset_file_name ?? "Untitled File";
+
+      if (!projectMap.has(projectId)) {
+        projectMap.set(projectId, {
+          projectId,
+          projectTitle,
+          assets: new Map(),
+        });
+      }
+
+      const projectGroup = projectMap.get(projectId)!;
+
+      if (!projectGroup.assets.has(assetId)) {
+        projectGroup.assets.set(assetId, {
+          assetId,
+          assetFileName,
+          rows: [],
+        });
+      }
+
+      projectGroup.assets.get(assetId)!.rows.push(row);
+    }
+
+    return Array.from(projectMap.values()).map((projectGroup) => ({
+      projectId: projectGroup.projectId,
+      projectTitle: projectGroup.projectTitle,
+      assets: Array.from(projectGroup.assets.values()).map((assetGroup) => ({
+        assetId: assetGroup.assetId,
+        assetFileName: assetGroup.assetFileName,
+        rows: assetGroup.rows.sort((a, b) => a.unit_index - b.unit_index),
+      })),
+    }));
+  }, [contentResults]);
 
   // Insert a newly created project into the current list
   function handleCreated(newProject: Project) {
@@ -186,6 +381,8 @@ export default function ProjectsPage() {
       <main className="mx-auto w-full max-w-[1460px] px-8 py-6">
         {/* Page title and toolbar */}
         <ProjectsToolbar
+          searchTab={searchTab}
+          setSearchTab={setSearchTab}
           query={query}
           onQueryChange={setQuery}
           onClickCreate={() => setIsCreateOpen(true)}
@@ -193,27 +390,62 @@ export default function ProjectsPage() {
 
         {/* Main project content */}
         <section className="mt-8">
-          {loadState === 'loading' && <ProjectsSkeleton />}
-
-          {loadState === 'error' && (
-            <ErrorState
-              message={errorMsg}
-              onRetry={() => window.location.reload()}
-            />
+          {!hasQuery && (
+            <>
+              {loadState === "loading" && <ProjectsSkeleton />}
+              {loadState === "error" && (
+                <ErrorState
+                  message={errorMsg}
+                  onRetry={() => window.location.reload()}
+                />
+              )}
+              {loadState === "ready" && projects.length === 0 && (
+                <EmptyState onClickCreate={() => setIsCreateOpen(true)} />
+              )}
+              {loadState === "ready" && projects.length > 0 && (
+                <ProjectsGrid
+                  projects={projects}
+                  deletingProjectId={deletingProjectId}
+                  openMenuProjectId={openMenuProjectId}
+                  onOpenMenu={setOpenMenuProjectId}
+                  onDeleteProject={handleDeleteProject}
+                />
+              )}
+            </>
           )}
 
-          {loadState === 'ready' && filtered.length === 0 && (
-            <EmptyState onClickCreate={() => setIsCreateOpen(true)} />
+          {hasQuery && searchTab === "projects" && (
+            <>
+              {loadState === "loading" && <ProjectsSkeleton />}
+              {loadState === "error" && (
+                <ErrorState
+                  message={errorMsg}
+                  onRetry={() => window.location.reload()}
+                />
+              )}
+              {loadState === "ready" && projects.length === 0 && (
+                <EmptyState onClickCreate={() => setIsCreateOpen(true)} />
+              )}
+              {loadState === "ready" && projects.length > 0 && filtered.length === 0 && (
+                <NoResultsState />
+              )}
+              {loadState === "ready" && filtered.length > 0 && (
+                <ProjectsGrid
+                  projects={filtered}
+                  deletingProjectId={deletingProjectId}
+                  openMenuProjectId={openMenuProjectId}
+                  onOpenMenu={setOpenMenuProjectId}
+                  onDeleteProject={handleDeleteProject}
+                />
+              )}
+            </>
           )}
 
-          {loadState === 'ready' && filtered.length > 0 && (
-            <ProjectsGrid
-              projects={filtered}
-              deletingProjectId={deletingProjectId}
-              openMenuProjectId={openMenuProjectId}
-              onOpenMenu={setOpenMenuProjectId}
-              onDeleteProject={handleDeleteProject}
-            />
+          {hasQuery && searchTab === "assets" && (
+            <AssetResults groups={groupedAssetResults} loading={searchingAssets} />
+          )}
+          {hasQuery && searchTab === "contents" && (
+            <ContentResults groups={groupedContentResults} loading={searchingContents} />
           )}
         </section>
 
@@ -252,6 +484,8 @@ function PageTopBar() {
 /* ---------- Title row and compact toolbar ---------- */
 function ProjectsToolbar(props: {
   query: string;
+  searchTab: SearchTab;
+  setSearchTab: (value: SearchTab) => void;
   onQueryChange: (v: string) => void;
   onClickCreate: () => void;
 }) {
@@ -273,7 +507,17 @@ function ProjectsToolbar(props: {
 
       {/* Search and placeholder controls */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-[320px] flex-1">
+        <div className="min-w-[320px] flex-1 space-y-2">
+          <Select value={props.searchTab} onValueChange={props.setSearchTab}>
+            <SelectTrigger className="h-10 rounded-[12px] border-neutral-300">
+              <SelectValue placeholder="Select tab" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="projects">Projects</SelectItem>
+              <SelectItem value="assets">Assets</SelectItem>
+              <SelectItem value="contents">Contents</SelectItem>
+            </SelectContent>
+          </Select>
           <input
             value={props.query}
             onChange={(e) => props.onQueryChange(e.target.value)}
@@ -375,7 +619,7 @@ function ProjectCard(props: {
       )}
 
       {/* Tile content */}
-      <a href={`/projects/${project.id}`} className="flex h-full flex-col">
+      <Link href={`/projects/${project.id}`} className="flex h-full flex-col">
         <CoverThumb url={project.cover_thumb_url ?? null} />
 
         <div className="flex flex-1 flex-col px-4 py-3">
@@ -391,7 +635,7 @@ function ProjectCard(props: {
             {project.description || 'No description yet'}
           </div>
         </div>
-      </a>
+      </Link>
     </div>
   );
 }
@@ -477,6 +721,20 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
   );
 }
 
+// No result state
+function NoResultsState() {
+  return (
+    <div className="rounded-[18px] border border-neutral-200 bg-white px-8 py-16 text-center">
+      <div className="text-lg font-semibold text-neutral-900">
+        No matching projects
+      </div>
+      <div className="mt-3 text-sm text-neutral-600">
+        Try a different keyword.
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Simple modal ---------- */
 function Modal(props: {
   title: string;
@@ -499,6 +757,254 @@ function Modal(props: {
 
         <div className="px-5 py-5">{props.children}</div>
       </div>
+    </div>
+  );
+}
+
+// Display search result, content level
+function ContentResults(props: {
+  groups: Array<{
+    projectId: string;
+    projectTitle: string;
+    assets: Array<{
+      assetId: string;
+      assetFileName: string;
+      rows: ContentUnitSearchRow[];
+    }>;
+  }>;
+  loading: boolean;
+}) {
+  const [openProjects, setOpenProjects] = useState<Record<string, boolean>>({});
+  const [openAssets, setOpenAssets] = useState<Record<string, boolean>>({});
+
+  function toggleProject(projectId: string) {
+    setOpenProjects((prev) => ({
+      ...prev,
+      [projectId]: !(prev[projectId] ?? true),
+    }));
+  }
+
+  function toggleAsset(assetId: string) {
+    setOpenAssets((prev) => ({
+      ...prev,
+      [assetId]: !(prev[assetId] ?? true),
+    }));
+  }
+
+  if (props.loading) {
+    return (
+      <div className="mt-6 rounded-[18px] border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
+        Searching...
+      </div>
+    );
+  }
+
+  if (props.groups.length === 0) {
+    return (
+      <div className="mt-6 rounded-[18px] border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
+        No content matched.
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-6 space-y-4">
+      {props.groups.map((projectGroup) => {
+        const isProjectOpen = openProjects[projectGroup.projectId] ?? true;
+
+        return (
+          <div
+            key={projectGroup.projectId}
+            className="overflow-hidden rounded-[18px] border border-neutral-200 bg-white"
+          >
+            <button
+              type="button"
+              onClick={() => toggleProject(projectGroup.projectId)}
+              className="flex w-full items-center justify-between bg-neutral-50 px-4 py-3 text-left"
+            >
+              <div>
+                <div className="text-sm font-semibold text-neutral-900">
+                  {projectGroup.projectTitle}
+                </div>
+                <div className="text-xs text-neutral-500">
+                  {projectGroup.assets.length} file{projectGroup.assets.length === 1 ? "" : "s"}
+                </div>
+              </div>
+
+              <div className="text-sm text-neutral-500">
+                {isProjectOpen ? "▾" : "▸"}
+              </div>
+            </button>
+
+            {isProjectOpen && (
+              <div className="divide-y divide-neutral-200">
+                {projectGroup.assets.map((assetGroup) => {
+                  const isAssetOpen = openAssets[assetGroup.assetId] ?? true;
+
+                  return (
+                    <div key={assetGroup.assetId}>
+                      <button
+                        type="button"
+                        onClick={() => toggleAsset(assetGroup.assetId)}
+                        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-neutral-50"
+                      >
+                        <div>
+                          <div className="text-sm font-medium text-neutral-900">
+                            {assetGroup.assetFileName}
+                          </div>
+                          <div className="text-xs text-neutral-500">
+                            {assetGroup.rows.length} match{assetGroup.rows.length === 1 ? "" : "es"}
+                          </div>
+                        </div>
+
+                        <div className="text-sm text-neutral-400">
+                          {isAssetOpen ? "▾" : "▸"}
+                        </div>
+                      </button>
+
+                      {isAssetOpen && (
+                        <div className="border-t border-neutral-100">
+                          {assetGroup.rows.map((row) => (
+                            <div
+                              key={row.id}
+                              className="flex gap-4 px-4 py-3 hover:bg-neutral-50"
+                            >
+                              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[12px] bg-neutral-100 text-xs text-neutral-400">
+                                {row.preview_url ? (
+                                  <img
+                                    src={row.preview_url}
+                                    alt={row.display_title ?? row.display_label ?? "preview"}
+                                    className="h-full w-full rounded-[12px] object-cover"
+                                  />
+                                ) : (
+                                  "Page"
+                                )}
+                              </div>
+
+                              <div className="min-w-0 flex-1">
+                                <div className="text-sm font-medium text-neutral-900">
+                                  {row.display_title ?? row.display_label ?? `Page ${row.unit_index}`}
+                                </div>
+
+                                <div className="mt-1 text-xs text-neutral-500">
+                                  {row.display_label ?? `Page ${row.unit_index}`} · {row.source_format ?? "unknown"}
+                                </div>
+
+                                <div className="mt-2 line-clamp-3 text-sm leading-6 text-neutral-700">
+                                  {row.snippet ?? "No text snippet available."}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Asset search result
+function AssetResults(props: {
+  groups: Array<{
+    projectId: string;
+    projectTitle: string;
+    rows: AssetSearchRow[];
+  }>;
+  loading: boolean;
+}) {
+  const [openProjects, setOpenProjects] = useState<Record<string, boolean>>({});
+
+  function toggleProject(projectId: string) {
+    setOpenProjects((prev) => ({
+      ...prev,
+      [projectId]: !(prev[projectId] ?? true),
+    }));
+  }
+
+  if (props.loading) {
+    return (
+      <div className="mt-6 rounded-[18px] border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
+        Searching...
+      </div>
+    );
+  }
+
+  if (props.groups.length === 0) {
+    return (
+      <div className="mt-6 rounded-[18px] border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
+        No assets found.
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-6 space-y-4">
+      {props.groups.map((group) => {
+        const isOpen = openProjects[group.projectId] ?? true;
+
+        return (
+          <div
+            key={group.projectId}
+            className="overflow-hidden rounded-[18px] border border-neutral-200 bg-white"
+          >
+            <button
+              type="button"
+              onClick={() => toggleProject(group.projectId)}
+              className="flex w-full items-center justify-between bg-neutral-50 px-4 py-3 text-left"
+            >
+              <div>
+                <div className="text-sm font-semibold text-neutral-900">
+                  {group.projectTitle}
+                </div>
+                <div className="text-xs text-neutral-500">
+                  {group.rows.length} asset{group.rows.length === 1 ? "" : "s"}
+                </div>
+              </div>
+
+              <div className="text-sm text-neutral-500">
+                {isOpen ? "▾" : "▸"}
+              </div>
+            </button>
+
+            {isOpen && (
+              <div className="divide-y divide-neutral-200">
+                {group.rows.map((row) => (
+                  <div
+                    key={row.id}
+                    className="flex items-center gap-4 px-4 py-3 hover:bg-neutral-50"
+                  >
+                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-neutral-100">
+                      {row.thumb_url ? (
+                        <img
+                          src={row.thumb_url}
+                          alt={row.file_name ?? "asset preview"}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : null}
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium text-neutral-900">
+                        {row.file_name ?? "Untitled asset"}
+                      </div>
+                      <div className="text-xs text-neutral-500">
+                        {row.asset_type ?? "Unknown type"}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
