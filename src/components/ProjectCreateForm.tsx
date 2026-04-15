@@ -143,7 +143,60 @@ export function ProjectCreateForm({
       });
 
       if (coverAsset.asset_type === "Image") {
-         await createImageContentUnit({supabase, asset: coverAsset});
+        await createImageContentUnit({supabase, asset: coverAsset});
+        const res = await fetch("/api/ingest/image", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ imageUrl: uploaded.publicUrl }),
+        });
+
+      const rawText = await res.text();
+
+      let payload: any = null;
+      try {
+        payload = JSON.parse(rawText);
+      } catch {
+        throw new Error(
+          `Image caption ingestion failed. Non-JSON response: ${rawText.slice(0, 160)}`
+        );
+      }
+
+      if (!res.ok) {
+        throw new Error(payload?.error ?? "Image caption ingestion failed.");
+      }
+
+        const searchText = [
+          payload.caption,
+          payload.imageType,
+          ...(payload.keywords ?? []),
+        ]
+          .filter(Boolean)
+          .join(". ");
+
+        const contentUpdate = await supabase
+          .from("asset_content_units")
+          .update({
+            generated_text: searchText,
+          })
+          .eq("asset_id", coverAsset.id)
+          .eq("unit_index", 1);
+
+        if (contentUpdate.error) {
+          throw contentUpdate.error;
+        }
+
+        const assetUpdate = await supabase
+          .from("assets")
+          .update({
+            ai_summary: searchText,
+          })
+          .eq("id", coverAsset.id);
+
+        if (assetUpdate.error) {
+          throw assetUpdate.error;
+        }
       }
 
       const { error: updateProjectError } = await supabase

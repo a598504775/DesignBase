@@ -262,7 +262,9 @@ export default function ProjectsPage() {
       projectMap.get(projectId)!.rows.push(row);
     }
 
-    return Array.from(projectMap.values());
+    return Array.from(projectMap.values()).sort((a, b) =>
+      a.projectTitle.localeCompare(b.projectTitle)
+    );
   }, [assetResults]);
 
   // Group content results

@@ -9,6 +9,7 @@ export type AssetSearchRow = {
   thumb_url: string | null;
   asset_type: string | null;
   uploaded_at: string | null;
+  ai_summary: string | null;
 };
 
 export async function searchAssets(params: {
@@ -30,7 +31,8 @@ export async function searchAssets(params: {
       storage_path,
       thumb_url,
       asset_type,
-      uploaded_at
+      uploaded_at,
+      ai_summary
       `
     )
     .order("uploaded_at", { ascending: false })
@@ -41,6 +43,7 @@ export async function searchAssets(params: {
       [
         `file_name.ilike.%${q}%`,
         `notes.ilike.%${q}%`,
+        `ai_summary.ilike.%${q}%`,
       ].join(",")
     );
   }

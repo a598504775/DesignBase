@@ -154,22 +154,110 @@ export default function UploadAssetsModal({
                 supabase,
                 asset: assetRow
             })
+            // If AI caption failed, uploading will not be stopped. It will create a log
+            try {
+                const res = await fetch("/api/ingest/image", {
+                    method: "POST",
+                    headers: {
+                    "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ imageUrl: uploaded.publicUrl }),
+                });
+
+                const rawText = await res.text();
+
+                let payload: any = null;
+                try {
+                payload = JSON.parse(rawText);
+                } catch {
+                throw new Error(
+                    `Image caption ingestion failed. Non-JSON response: ${rawText.slice(0, 160)}`
+                );
+                }
+
+                if (!res.ok) {
+                throw new Error(payload?.error ?? "Image caption ingestion failed.");
+                }
+
+                const searchText = [
+                    payload.caption,
+                    payload.imageType,
+                    ...(payload.keywords ?? []),
+                ]
+                    .filter(Boolean)
+                    .join(". ");
+
+                const contentUpdate = await supabase
+                    .from("asset_content_units")
+                    .update({
+                    generated_text: searchText,
+                    })
+                    .eq("asset_id", assetRow.id)
+                    .eq("unit_index", 1);
+                if (contentUpdate.error) {
+                    throw contentUpdate.error;
+                }
+
+                const assetUpdate = await supabase
+                .from("assets")
+                .update({
+                    ai_summary: searchText,
+                })
+                .eq("id", assetRow.id);
+
+                if (assetUpdate.error) {
+                    throw assetUpdate.error;
+                }
+
+            } catch (captionError) {
+               console.error("Image caption ingestion failed:", captionError);
+            }
         }
 
         if (assetRow.asset_type === "PDF") {
-            fetch("/api/ingest/pdf", {
-                method: "POST",
-                headers: {
-                "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                assetId: assetRow.id,
-                projectId: assetRow.project_id,
-                storagePath: assetRow.storage_path,
-                }),
-            }).catch((err) => {
-                console.error("PDF ingestion failed:", err);
-            });
+            (async () => {
+                try {
+                const ingestRes = await fetch("/api/ingest/pdf", {
+                    method: "POST",
+                    headers: {
+                    "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                    assetId: assetRow.id,
+                    projectId: assetRow.project_id,
+                    storagePath: assetRow.storage_path,
+                    }),
+                });
+
+                const ingestPayload = await ingestRes.json().catch(() => null);
+
+                if (!ingestRes.ok) {
+                    throw new Error(
+                    ingestPayload?.error ?? "PDF page ingestion failed."
+                    );
+                }
+
+                const summaryRes = await fetch("/api/ingest/pdf-summary", {
+                    method: "POST",
+                    headers: {
+                    "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                    assetId: assetRow.id,
+                    }),
+                });
+
+                const summaryPayload = await summaryRes.json().catch(() => null);
+
+                if (!summaryRes.ok) {
+                    throw new Error(
+                    summaryPayload?.error ?? "PDF asset summary failed."
+                    );
+                }
+                } catch (err) {
+                console.error("PDF ingestion pipeline failed:", err);
+                }
+            })();
         }
       }
 
