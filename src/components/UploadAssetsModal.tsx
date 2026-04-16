@@ -35,6 +35,10 @@ function isImage(name: string): boolean {
   );
 }
 
+function isDocx(name: string): boolean {
+  return name.toLowerCase().endsWith(".docx");
+}
+
 function formatBytes(bytes: number): string {
   const units = ["B", "KB", "MB", "GB", "TB"];
   let v = bytes;
@@ -258,6 +262,62 @@ export default function UploadAssetsModal({
                 console.error("PDF ingestion pipeline failed:", err);
                 }
             })();
+        }
+
+        if (isDocx(f.name)) {
+        console.log("DOCX branch entered:", f.name, assetRow);
+
+        (async () => {
+            try {
+            console.log("Calling /api/ingest/docx for:", assetRow.id);
+
+            const ingestRes = await fetch("/api/ingest/docx", {
+                method: "POST",
+                headers: {
+                "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                assetId: assetRow.id,
+                projectId: assetRow.project_id,
+                storagePath: assetRow.storage_path,
+                }),
+            });
+
+            console.log("DOCX ingest status:", ingestRes.status);
+
+            const ingestPayload = await ingestRes.json().catch(() => null);
+            console.log("DOCX ingest payload:", ingestPayload);
+
+            if (!ingestRes.ok) {
+                throw new Error(ingestPayload?.error ?? "DOCX ingestion failed.");
+            }
+
+            console.log("Calling /api/ingest/docx-summary for:", assetRow.id);
+
+            const summaryRes = await fetch("/api/ingest/docx-summary", {
+                method: "POST",
+                headers: {
+                "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                assetId: assetRow.id,
+                }),
+            });
+
+            console.log("DOCX summary status:", summaryRes.status);
+
+            const summaryPayload = await summaryRes.json().catch(() => null);
+            console.log("DOCX summary payload:", summaryPayload);
+
+            if (!summaryRes.ok) {
+                throw new Error(
+                summaryPayload?.error ?? "DOCX asset summary failed."
+                );
+            }
+            } catch (err) {
+            console.error("DOCX ingestion pipeline failed:", err);
+            }
+        })();
         }
       }
 

@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-export const runtime = "nodejs";
-
 function getSupabaseServerClient() {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -14,21 +12,21 @@ function getSupabaseServerClient() {
   return createClient(supabaseUrl, supabaseKey);
 }
 
+export const runtime = "nodejs";
+
 export async function POST() {
   try {
     const supabase = getSupabaseServerClient();
 
-    const { data: pdfAssets, error } = await supabase
+    const { data: docxAssets, error } = await supabase
       .from("assets")
-      .select("id, project_id, storage_path, asset_type")
-      .eq("asset_type", "PDF")
+      .select("id, project_id, storage_path, file_name")
+      .ilike("file_name", "%.docx")
       .not("storage_path", "is", null);
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
-    const assets = pdfAssets ?? [];
+    const assets = docxAssets ?? [];
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
 
     const results: Array<{
@@ -39,7 +37,7 @@ export async function POST() {
 
     for (const asset of assets) {
       try {
-        const ingestRes = await fetch(`${baseUrl}/api/ingest/pdf`, {
+        const ingestRes = await fetch(`${baseUrl}/api/ingest/docx`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -56,12 +54,12 @@ export async function POST() {
           results.push({
             assetId: asset.id,
             ok: false,
-            error: payload?.error ?? "PDF ingestion failed",
+            error: payload?.error ?? "DOCX ingestion failed",
           });
           continue;
         }
 
-        const summaryRes = await fetch(`${baseUrl}/api/ingest/pdf-summary`, {
+        const summaryRes = await fetch(`${baseUrl}/api/ingest/docx-summary`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -76,7 +74,7 @@ export async function POST() {
           results.push({
             assetId: asset.id,
             ok: false,
-            error: payload?.error ?? "PDF summary failed",
+            error: payload?.error ?? "DOCX summary failed",
           });
           continue;
         }
@@ -105,12 +103,12 @@ export async function POST() {
       results,
     });
   } catch (error: any) {
-    console.error("PDF backfill failed:", error);
+    console.error("DOCX backfill failed:", error);
 
     return NextResponse.json(
       {
         ok: false,
-        error: error?.message ?? "PDF backfill failed.",
+        error: error?.message ?? "DOCX backfill failed.",
       },
       { status: 500 }
     );

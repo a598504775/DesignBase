@@ -36,6 +36,11 @@ function stripExtension(fileName: string): string {
   return fileName.slice(0, idx);
 }
 
+function makeDocxBlockTitle(fileName: string | null, index: number): string {
+  const base = stripExtension(fileName ?? "Word Document");
+  return `${base} - Block ${index}`;
+}
+
 export async function createImageContentUnit(params: {
   supabase: SupabaseClient;
   asset: AssetRow;
@@ -111,4 +116,55 @@ export async function createPdfPageContentUnit(params: {
   if (error) throw error;
 
   return data;
+}
+
+export async function createDocxTextBlockContentUnits(params: {
+  supabase: SupabaseClient;
+  asset: Pick<AssetRow, "id" | "project_id" | "file_name" | "asset_type">;
+  blocks: string[];
+}) {
+  const { supabase, asset, blocks } = params;
+
+  // Delete old asset in docx text blocks to avoid repetition
+  const { error: deleteError } = await supabase
+    .from("asset_content_units")
+    .delete()
+    .eq("asset_id", asset.id)
+    .eq("unit_type", "text_block")
+    .eq("source_format", "docx");
+
+  if (deleteError) throw deleteError;
+
+  if (blocks.length === 0) {
+    return [];
+  }
+
+  const rows = blocks.map((text, idx) => ({
+    asset_id: asset.id,
+    project_id: asset.project_id,
+    unit_index: idx + 1,
+    unit_type: "text_block",
+    source_format: "docx",
+    extracted_text: text,
+    generated_text: null,
+    preview_url: null,
+    display_label: `Block ${idx + 1}`,
+    display_title: makeDocxBlockTitle(asset.file_name, idx + 1),
+    text_kind: "native_text",
+    content_kind: "text_heavy",
+    meta: {
+      asset_type: asset.asset_type,
+    },
+  }));
+
+  const { data, error } = await supabase
+    .from("asset_content_units")
+    .insert(rows)
+    .select(
+      "id, asset_id, project_id, unit_index, unit_type, source_format, extracted_text, generated_text, preview_url, display_label, display_title, text_kind, content_kind, meta, created_at"
+    );
+
+  if (error) throw error;
+
+  return (data ?? []) as AssetContentUnitRow[];
 }
