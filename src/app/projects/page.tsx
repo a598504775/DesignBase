@@ -4,13 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { ProjectCreateForm } from '@/components/ProjectCreateForm';
 import { createClient } from '@/utils/supabase/client';
 import { ContentUnitSearchRow, searchContentUnits } from '@/lib/searchContentUnits'
-import {
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
-} from "@/components/ui/select";
 import Link from "next/link";
 import { AssetSearchRow, searchAssets } from '@/lib/searchAssets';
 
@@ -332,6 +325,117 @@ export default function ProjectsPage() {
     setIsCreateOpen(false);
   }
 
+  function getResultsTitle() {
+    if (!hasQuery) return "Projects";
+
+    if (searchTab === "projects") {
+      return `${filtered.length} Projects Found`;
+    }
+
+    if (searchTab === "assets") {
+      return `${assetResults.length} Assets Found`;
+    }
+
+    return `${contentResults.length} Contents Found`;
+  }
+
+  function renderRightControls() {
+    if (!hasQuery) {
+      return (
+        <>
+          <SortButton />
+          <IconButton ariaLabel="Tile view">▦</IconButton>
+          <IconButton ariaLabel="List view">☰</IconButton>
+          <button
+            onClick={() => setIsCreateOpen(true)}
+            className="flex h-9 items-center justify-center rounded-[4px] border border-[#66BF86] bg-[#91E0B0] px-4.5 text-[18px] font-medium text-black hover:bg-[#66BF86]"
+          >
+            new project
+          </button>
+        </>
+      );
+    }
+
+    return <SortButton />;
+  }  
+
+  function renderResultsContent() {
+    if (!hasQuery) {
+      return (
+        <>
+          {loadState === "loading" && <ProjectsSkeleton />}
+
+          {loadState === "error" && (
+            <ErrorState
+              message={errorMsg}
+              onRetry={() => window.location.reload()}
+            />
+          )}
+
+          {loadState === "ready" && projects.length === 0 && (
+            <EmptyState onClickCreate={() => setIsCreateOpen(true)} />
+          )}
+
+          {loadState === "ready" && projects.length > 0 && (
+            <ProjectsGrid
+              projects={projects}
+              deletingProjectId={deletingProjectId}
+              openMenuProjectId={openMenuProjectId}
+              onOpenMenu={setOpenMenuProjectId}
+              onDeleteProject={handleDeleteProject}
+            />
+          )}
+        </>
+      );
+    }
+
+    if (searchTab === "projects") {
+      return (
+        <>
+          {loadState === "loading" && <ProjectsSkeleton />}
+
+          {loadState === "error" && (
+            <ErrorState
+              message={errorMsg}
+              onRetry={() => window.location.reload()}
+            />
+          )}
+
+          {loadState === "ready" && filtered.length === 0 && (
+            <NoResultsState />
+          )}
+
+          {loadState === "ready" && filtered.length > 0 && (
+            <ProjectsGrid
+              projects={filtered}
+              deletingProjectId={deletingProjectId}
+              openMenuProjectId={openMenuProjectId}
+              onOpenMenu={setOpenMenuProjectId}
+              onDeleteProject={handleDeleteProject}
+            />
+          )}
+        </>
+      );
+    }
+
+    if (searchTab === "assets") {
+      return (
+        <AssetResults
+          groups={groupedAssetResults}
+          loading={searchingAssets}
+        />
+      );
+    }
+
+    return (
+      <ContentResults
+        groups={groupedContentResults}
+        loading={searchingContents}
+      />
+    );
+  } 
+
+
   // Delete one project and its files
   async function handleDeleteProject(projectId: string) {
     const confirmed = window.confirm(
@@ -378,113 +482,37 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Full-width thin top bar */}
+    <div className="flex h-screen flex-col overflow-hidden bg-[#F5F5F5]">
       <PageTopBar />
 
-      {/* Main content container */}
-      <main className="mx-auto w-full max-w-[1460px] px-8 py-6">
-
-        <div className="mb-8 flex items-center justify-between">
-          <h1 className="text-[48px] font-bold leading-none text-black">Projects</h1>
-
-          <div className="flex items-center gap-3">
-            <button className="flex h-12 min-w-[48px] items-center justify-center rounded-[4px] border border-[#D9D9D9] bg-white text-black hover:bg-[#F5F5F5]">
-              ▦
-            </button>
-
-            <button className="flex h-12 min-w-[48px] items-center justify-center rounded-[4px] border border-[#D9D9D9] bg-white text-black hover:bg-[#F5F5F5]">
-              ☰
-            </button>
-
-            <button
-              onClick={() => setIsCreateOpen(true)}
-              className="flex h-12 items-center justify-center rounded-[4px] border border-[#66BF86] bg-[#91E0B0] px-6 text-[24px] font-medium text-black hover:brightness-95"
-            >
-              new project
-            </button>
-          </div>
+      <main className="flex min-h-0 flex-1 flex-col px-9 pb-9">
+        <div>
+          <SearchBarSection
+            searchTab={searchTab}
+            query={query}
+            onTabChange={setSearchTab}
+            onQueryChange={setQuery}
+            onClear={() => setQuery("")}
+            onCopy={() => {
+              navigator.clipboard.writeText(query);
+            }}
+          />
         </div>
 
-        {/* Page title and toolbar */}
-        <SearchBarSection
-          searchTab={searchTab}
-          query={query}
-          onTabChange={setSearchTab}
-          onQueryChange={setQuery}
-          onClear={() => setQuery("")}
-          onCopy={() => {
-            navigator.clipboard.writeText(query);
-          }}
-        />        
-
-        {/* Main project content */}
-        <section className="mt-8 flex items-start gap-12">
-          <FilterPanel searchTab={searchTab} />
-
-          <div className="min-w-0 flex-1">
-            {!hasQuery && (
-              <>
-                {loadState === "loading" && <ProjectsSkeleton />}
-                {loadState === "error" && (
-                  <ErrorState
-                    message={errorMsg}
-                    onRetry={() => window.location.reload()}
-                  />
-                )}
-                {loadState === "ready" && projects.length === 0 && (
-                  <EmptyState onClickCreate={() => setIsCreateOpen(true)} />
-                )}
-                {loadState === "ready" && projects.length > 0 && (
-                  <ProjectsGrid
-                    projects={projects}
-                    deletingProjectId={deletingProjectId}
-                    openMenuProjectId={openMenuProjectId}
-                    onOpenMenu={setOpenMenuProjectId}
-                    onDeleteProject={handleDeleteProject}
-                  />
-                )}
-              </>
-            )}
-
-            {hasQuery && searchTab === "projects" && (
-              <>
-                {loadState === "loading" && <ProjectsSkeleton />}
-                {loadState === "error" && (
-                  <ErrorState
-                    message={errorMsg}
-                    onRetry={() => window.location.reload()}
-                  />
-                )}
-                {loadState === "ready" && projects.length === 0 && (
-                  <EmptyState onClickCreate={() => setIsCreateOpen(true)} />
-                )}
-                {loadState === "ready" && projects.length > 0 && filtered.length === 0 && (
-                  <NoResultsState />
-                )}
-                {loadState === "ready" && filtered.length > 0 && (
-                  <ProjectsGrid
-                    projects={filtered}
-                    deletingProjectId={deletingProjectId}
-                    openMenuProjectId={openMenuProjectId}
-                    onOpenMenu={setOpenMenuProjectId}
-                    onDeleteProject={handleDeleteProject}
-                  />
-                )}
-              </>
-            )}
-
-            {hasQuery && searchTab === "assets" && (
-              <AssetResults groups={groupedAssetResults} loading={searchingAssets} />
-            )}
-
-            {hasQuery && searchTab === "contents" && (
-              <ContentResults groups={groupedContentResults} loading={searchingContents} />
-            )}
+        <section className="mt-4.5 flex min-h-0 flex-1 gap-4.5">
+          <div className="h-full w-[288px] shrink-0">
+            <FilterPanel searchTab={searchTab} />
           </div>
+
+          <ResultsShell
+            title={getResultsTitle()}
+            isSearching={hasQuery}
+            rightControls={renderRightControls()}
+          >
+            {renderResultsContent()}
+          </ResultsShell>
         </section>
 
-        {/* Create project modal */}
         {isCreateOpen && (
           <Modal title="Create Project" onClose={() => setIsCreateOpen(false)}>
             <ProjectCreateForm
@@ -494,6 +522,8 @@ export default function ProjectsPage() {
           </Modal>
         )}
       </main>
+
+      <BottomBar />
     </div>
   );
 }
@@ -501,21 +531,38 @@ export default function ProjectsPage() {
 /* ---------- Thin full-width top bar ---------- */
 function PageTopBar() {
   return (
-    <header className="w-full border-b border-neutral-200 bg-white">
-      <div className="mx-auto flex h-10 w-full max-w-[1460px] items-center justify-between px-8">
-        <div className="text-[16px] font-medium text-neutral-900">
-          Sample design base
+    <header className="w-full bg-black">
+      <div className="flex h-9 w-full items-center justify-between px-9">
+        <div className="flex items-center gap-4">
+          <div className="h-3 w-3 bg-[#91E0B0]" />
+          <div className="text-[16px] font-medium text-white">
+            Sample design base
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="text-xs text-neutral-800">Admin</div>
-          <div className="h-7 w-7 rounded-full border border-neutral-500 bg-white" />
+        <div className="flex items-center gap-3">
+          <div className="text-[16px] text-white">Admin</div>
+          <div className="h-8 w-8 rounded-full bg-[#91E0B0]" />
         </div>
       </div>
     </header>
   );
 }
 
+/* ---------- Thin full-width bottom bar ---------- */
+function BottomBar() {
+  return (
+    <footer className="h-4.5 shrink-0 bg-[#66BF86]">
+      <div className="flex h-full w-full items-center justify-end px-9 text-[12px] leading-none text-white">
+        <span>Version</span>
+        <span className="mx-2 h-4 w-px bg-white/70" />
+        <span>Term of use</span>
+        <span className="mx-2 h-4 w-px bg-white/70" />
+        <span>About</span>
+      </div>
+    </footer>
+  );
+}
 
 /* ---------- Project grid ---------- */
 function ProjectsGrid(props: {
@@ -526,7 +573,7 @@ function ProjectsGrid(props: {
   onDeleteProject: (projectId: string) => void;
 }) {
   return (
-    <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    <div className="grid grid-cols-[repeat(auto-fill,336px)] gap-x-4.5 gap-y-4.5">
       {props.projects.map((p) => (
         <ProjectCard
           key={p.id}
@@ -556,7 +603,7 @@ function ProjectCard(props: {
   const { project, isDeleting, menuOpen, onToggleMenu, onCloseMenu, onDelete } = props;
 
   return (
-    <div className="group relative aspect-square overflow-hidden rounded-[18px] border border-neutral-200 bg-white transition hover:shadow-sm">
+    <div className="group relative h-[336px] w-[336px] overflow-hidden rounded-[4px] border border-[#D9D9D9] bg-white transition hover:bg-[#F5F5F5]">
       {/* Tile action trigger */}
       <button
         type="button"
@@ -565,14 +612,14 @@ function ProjectCard(props: {
           e.stopPropagation();
           onToggleMenu();
         }}
-        className="absolute right-3 top-3 z-10 hidden rounded-lg bg-white/95 px-2.5 py-0.5 text-sm text-neutral-700 shadow-sm ring-1 ring-neutral-200 group-hover:block"
+        className="absolute right-2 top-2 z-20 w-9 rounded-[4px] border border-[#D9D9D9] bg-white p-1"
       >
         ⋮
       </button>
 
       {/* Tile action menu */}
       {menuOpen && (
-        <div className="absolute right-3 top-10 z-20 w-40 rounded-xl border border-neutral-200 bg-white p-1 shadow-lg">
+        <div className="absolute right-2 top-2 z-20 w-40 rounded-[4px] border border-neutral-200 bg-white p-1 shadow-lg">
           <button
             type="button"
             onClick={(e) => {
@@ -582,7 +629,7 @@ function ProjectCard(props: {
               onDelete();
             }}
             disabled={isDeleting}
-            className="block w-full rounded-lg px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+            className="block w-full rounded-[4px] px-2 py-2 text-left text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
           >
             {isDeleting ? 'Deleting...' : 'Delete project'}
           </button>
@@ -594,15 +641,15 @@ function ProjectCard(props: {
         <CoverThumb url={project.cover_thumb_url ?? null} />
 
         <div className="flex flex-1 flex-col px-4 py-3">
-          <div className="line-clamp-2 text-[16px] font-semibold leading-5 text-neutral-900">
+          <div className="line-clamp-2 text-[16px] font-semibold leading-5 text-black">
             {project.title || 'Untitled Project'}
           </div>
 
-          <div className="mt-1 text-[12px] text-neutral-500">
+          <div className="mt-1 text-[12px] leading-5 text-[#8E8E93]">
             {project.location || 'No location'}
           </div>
 
-          <div className="mt-2 line-clamp-3 text-[13px] leading-5 text-neutral-700">
+          <div className="mt-3 line-clamp-4 text-[12px] leading-5 text-black">
             {project.description || 'No description yet'}
           </div>
         </div>
@@ -615,7 +662,7 @@ function ProjectCard(props: {
 function CoverThumb({ url }: { url: string | null }) {
   if (url) {
     return (
-      <div className="h-[58%] w-full overflow-hidden">
+      <div className="h-[192px] w-full overflow-hidden bg-[#D9D9D9]">
         <img
           src={url}
           alt="cover"
@@ -626,7 +673,7 @@ function CoverThumb({ url }: { url: string | null }) {
   }
 
   return (
-    <div className="flex h-[58%] w-full items-center justify-center bg-neutral-100 text-sm text-neutral-500">
+    <div className="flex h-[192px] w-full items-center justify-center bg-[#D9D9D9] text-[16px] text-[#8E8E93]">
       No cover
     </div>
   );
@@ -635,8 +682,8 @@ function CoverThumb({ url }: { url: string | null }) {
 /* ---------- Empty state ---------- */
 function EmptyState({ onClickCreate }: { onClickCreate: () => void }) {
   return (
-    <div className="rounded-[18px] border border-dashed border-neutral-300 bg-white px-8 py-16 text-center">
-      <div className="text-lg font-semibold text-neutral-900">
+    <div className="rounded-[4px] border border-dashed border-neutral-300 bg-white px-8 py-16 text-center">
+      <div className="text-[16px] font-semibold text-neutral-900">
         No projects yet
       </div>
       <div className="mt-3 text-sm text-neutral-600">
@@ -695,11 +742,11 @@ function ErrorState({ message, onRetry }: { message: string; onRetry: () => void
 // No result state
 function NoResultsState() {
   return (
-    <div className="rounded-[18px] border border-neutral-200 bg-white px-8 py-16 text-center">
-      <div className="text-lg font-semibold text-neutral-900">
+    <div className="rounded-[4px] border border-neutral-200 bg-white px-8 py-16 text-center">
+      <div className="text-[16px] font-semibold text-neutral-900">
         No matching projects
       </div>
-      <div className="mt-3 text-sm text-neutral-600">
+      <div className="mt-3 text-[12px] text-neutral-600">
         Try a different keyword.
       </div>
     </div>
@@ -716,7 +763,7 @@ function Modal(props: {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
       <div className="w-full max-w-xl rounded-[22px] bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-neutral-100 px-5 py-4">
-          <div className="text-sm font-semibold">{props.title}</div>
+          <div className="text-[16px] font-semibold">{props.title}</div>
           <button
             onClick={props.onClose}
             className="rounded-lg px-2 py-1 text-sm text-neutral-600 hover:bg-neutral-100"
@@ -746,7 +793,6 @@ function ContentResults(props: {
   loading: boolean;
 }) {
   const [openProjects, setOpenProjects] = useState<Record<string, boolean>>({});
-  const [openAssets, setOpenAssets] = useState<Record<string, boolean>>({});
 
   function toggleProject(projectId: string) {
     setOpenProjects((prev) => ({
@@ -755,128 +801,104 @@ function ContentResults(props: {
     }));
   }
 
-  function toggleAsset(assetId: string) {
-    setOpenAssets((prev) => ({
-      ...prev,
-      [assetId]: !(prev[assetId] ?? true),
-    }));
-  }
-
   if (props.loading) {
-    return (
-      <div className="mt-6 rounded-[18px] border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
-        Searching...
-      </div>
-    );
+    return <ResultMessage>Searching...</ResultMessage>;
   }
 
   if (props.groups.length === 0) {
-    return (
-      <div className="mt-6 rounded-[18px] border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
-        No content matched.
-      </div>
-    );
+    return <ResultMessage>No content matched.</ResultMessage>;
   }
 
   return (
-    <div className="mt-6 space-y-4">
+    <div className="space-y-6">
       {props.groups.map((projectGroup) => {
         const isProjectOpen = openProjects[projectGroup.projectId] ?? true;
 
         return (
-          <div
-            key={projectGroup.projectId}
-            className="overflow-hidden rounded-[18px] border border-neutral-200 bg-white"
-          >
+          <section key={projectGroup.projectId}>
             <button
               type="button"
               onClick={() => toggleProject(projectGroup.projectId)}
-              className="flex w-full items-center justify-between bg-neutral-50 px-4 py-3 text-left"
+              className="mb-3 flex h-8 items-center gap-2 text-left text-[16px] font-semibold text-black hover:text-[#66BF86]"
             >
-              <div>
-                <div className="text-sm font-semibold text-neutral-900">
-                  {projectGroup.projectTitle}
-                </div>
-                <div className="text-xs text-neutral-500">
-                  {projectGroup.assets.length} file{projectGroup.assets.length === 1 ? "" : "s"}
-                </div>
-              </div>
-
-              <div className="text-sm text-neutral-500">
+              <span className="text-[16px] leading-none">
                 {isProjectOpen ? "▾" : "▸"}
-              </div>
+              </span>
+              <span>{projectGroup.projectTitle}</span>
             </button>
 
             {isProjectOpen && (
-              <div className="divide-y divide-neutral-200">
-                {projectGroup.assets.map((assetGroup) => {
-                  const isAssetOpen = openAssets[assetGroup.assetId] ?? true;
-
-                  return (
-                    <div key={assetGroup.assetId}>
-                      <button
-                        type="button"
-                        onClick={() => toggleAsset(assetGroup.assetId)}
-                        className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-neutral-50"
-                      >
-                        <div>
-                          <div className="text-sm font-medium text-neutral-900">
-                            {assetGroup.assetFileName}
-                          </div>
-                          <div className="text-xs text-neutral-500">
-                            {assetGroup.rows.length} match{assetGroup.rows.length === 1 ? "" : "es"}
-                          </div>
-                        </div>
-
-                        <div className="text-sm text-neutral-400">
-                          {isAssetOpen ? "▾" : "▸"}
-                        </div>
-                      </button>
-
-                      {isAssetOpen && (
-                        <div className="border-t border-neutral-100">
-                          {assetGroup.rows.map((row) => (
-                            <div
-                              key={row.id}
-                              className="flex gap-4 px-4 py-3 hover:bg-neutral-50"
-                            >
-                              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[12px] bg-neutral-100 text-xs text-neutral-400">
-                                {row.preview_url ? (
-                                  <img
-                                    src={row.preview_url}
-                                    alt={row.display_title ?? row.display_label ?? "preview"}
-                                    className="h-full w-full rounded-[12px] object-cover"
-                                  />
-                                ) : (
-                                  "Page"
-                                )}
-                              </div>
-
-                              <div className="min-w-0 flex-1">
-                                <div className="text-sm font-medium text-neutral-900">
-                                  {row.display_title ?? row.display_label ?? `Page ${row.unit_index}`}
-                                </div>
-
-                                <div className="mt-1 text-xs text-neutral-500">
-                                  {row.display_label ?? `Page ${row.unit_index}`} · {row.source_format ?? "unknown"}
-                                </div>
-
-                                <div className="mt-2 line-clamp-3 text-sm leading-6 text-neutral-700">
-                                  {row.snippet ?? "No text snippet available."}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
+              <div className="space-y-6">
+                <div
+                  className="
+                    grid
+                    grid-cols-[repeat(auto-fill,minmax(324px,1fr))]
+                    gap-4.5
+                  "
+                >
+                  {projectGroup.assets.flatMap((assetGroup) =>
+                    assetGroup.rows.map((row) => (
+                      <ContentResultCard key={row.id} row={row} />
+                    ))
+                  )}
+                </div>
               </div>
             )}
-          </div>
+          </section>
         );
       })}
+    </div>
+  );
+}
+
+function ContentResultCard({ row }: { row: ContentUnitSearchRow }) {
+  const title =
+    row.display_label ??
+    row.display_title ??
+    `Page ${row.unit_index}`;
+
+  return (
+    <div
+      className="
+        w-[324px]
+        h-[108px]
+        flex
+        items-start
+        gap-3
+        rounded-[4px]
+        border
+        hover:bg-[#EDEDED]
+      "
+    >
+      {/* preview */}
+      <div className="w-[108px] h-full shrink-0 bg-[#D9D9D9]">
+        {row.preview_url ? (
+          <img
+            src={row.preview_url}
+            alt={title}
+            className="h-full w-full object-cover rounded-[4px]"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-[12px] text-[#8E8E93]">
+            Preview
+          </div>
+        )}
+      </div>
+
+      {/* text */}
+      <div className="min-w-0 flex-1 p-3">
+        <div className="truncate text-[14px] font-semibold text-black">
+          {title}
+        </div>
+
+        <div className="truncate text-[12px] text-[#8E8E93]">
+          {row.asset_file_name ?? "Unknown"}
+        </div>
+
+        <div className="mt-1 line-clamp-2 text-[12px] text-[#8E8E93]">
+          {row.snippet ?? "No text snippet available."}
+        </div>
+      </div>
     </div>
   );
 }
@@ -900,82 +922,144 @@ function AssetResults(props: {
   }
 
   if (props.loading) {
-    return (
-      <div className="mt-6 rounded-[18px] border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
-        Searching...
-      </div>
-    );
+    return <ResultMessage>Searching...</ResultMessage>;
   }
 
   if (props.groups.length === 0) {
-    return (
-      <div className="mt-6 rounded-[18px] border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
-        No assets found.
-      </div>
-    );
+    return <ResultMessage>No assets found.</ResultMessage>;
   }
 
   return (
-    <div className="mt-6 space-y-4">
+    <div className="space-y-6">
       {props.groups.map((group) => {
         const isOpen = openProjects[group.projectId] ?? true;
 
         return (
-          <div
-            key={group.projectId}
-            className="overflow-hidden rounded-[18px] border border-neutral-200 bg-white"
-          >
+          <section key={group.projectId}>
             <button
               type="button"
               onClick={() => toggleProject(group.projectId)}
-              className="flex w-full items-center justify-between bg-neutral-50 px-4 py-3 text-left"
+              className="mb-3 flex h-8 items-center gap-2 text-left text-[16px] font-semibold text-black hover:text-[#66BF86]"
             >
-              <div>
-                <div className="text-sm font-semibold text-neutral-900">
-                  {group.projectTitle}
-                </div>
-                <div className="text-xs text-neutral-500">
-                  {group.rows.length} asset{group.rows.length === 1 ? "" : "s"}
-                </div>
-              </div>
-
-              <div className="text-sm text-neutral-500">
+              <span className="text-[16px] leading-none">
                 {isOpen ? "▾" : "▸"}
-              </div>
+              </span>
+              <span>{group.projectTitle}</span>
             </button>
 
             {isOpen && (
-              <div className="divide-y divide-neutral-200">
+              <div className="space-y-4">
                 {group.rows.map((row) => (
-                  <div
-                    key={row.id}
-                    className="flex items-center gap-4 px-4 py-3 hover:bg-neutral-50"
-                  >
-                    <div className="h-12 w-12 shrink-0 overflow-hidden rounded bg-neutral-100">
-                      {row.thumb_url ? (
-                        <img
-                          src={row.thumb_url}
-                          alt={row.file_name ?? "asset preview"}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : null}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium text-neutral-900">
-                        {row.file_name ?? "Untitled asset"}
-                      </div>
-                      <div className="text-xs text-neutral-500">
-                        {row.asset_type ?? "Unknown type"}
-                      </div>
-                    </div>
-                  </div>
+                  <AssetResultRow key={row.id} row={row} />
                 ))}
               </div>
             )}
-          </div>
+          </section>
         );
       })}
     </div>
+  );
+}
+
+function AssetResultRow({ row }: { row: AssetSearchRow }) {
+  const summary =
+    (row as any).ai_summary ||
+    "No description available.";
+
+  return (
+    <div className="flex h-[108px] overflow-hidden rounded-[4px] border border-[#D9D9D9] bg-white hover:bg-[#F5F5F5]">
+      <div className="h-[108px] w-[108px] shrink-0 bg-[#D9D9D9]">
+        {row.thumb_url ? (
+          <img
+            src={row.thumb_url}
+            alt={row.file_name ?? "asset preview"}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-[14px] text-[#8E8E93]">
+            Preview
+          </div>
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1 px-4 py-3">
+        <div className="truncate text-[14px] font-semibold leading-5 text-black">
+          {row.file_name ?? "Untitled asset"}
+        </div>
+
+        <div className="mt-0.5 text-[14px] leading-5 text-[#8E8E93]">
+          {row.asset_type ?? "Unknown type"}
+        </div>
+
+        <div className="mt-2 line-clamp-2 text-[14px] leading-5 text-[#8E8E93]">
+          Description: {summary}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ResultMessage({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="rounded-[4px] border border-[#D9D9D9] bg-white px-4 py-4 text-[14px] text-[#8E8E93]">
+      {children}
+    </div>
+  );
+}
+
+function ResultsShell(props: {
+  title: string;
+  isSearching: boolean;
+  rightControls?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex min-h-0 flex-1 flex-col rounded-[4px] border border-[#D9D9D9] bg-white">
+      <div className="flex h-[72px] shrink-0 items-center justify-between px-9">
+        <h1
+          className={
+            props.isSearching
+              ? "text-[18px] font-bold leading-none text-[#66BF86]"
+              : "text-[36px] font-bold leading-none text-black"
+          }
+        >
+          {props.title}
+        </h1>
+
+        <div className="flex items-center gap-3">
+          {props.rightControls}
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto px-9 py-0 custom-scroll">
+        {props.children}
+      </div>
+    </div>
+  );
+}
+
+function SortButton() {
+  return (
+    <button
+      type="button"
+      className="flex h-9 items-center justify-center rounded-[4px] border border-[#8E8E93] bg-white px-5 text-[18px] text-black hover:bg-[#F5F5F5]"
+    >
+      ↓ name
+    </button>
+  );
+}
+
+function IconButton(props: {
+  children: React.ReactNode;
+  ariaLabel: string;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={props.ariaLabel}
+      className="flex h-9 w-9 items-center justify-center rounded-[4px] border border-[#D9D9D9] bg-white text-[20px] text-black hover:bg-[#F5F5F5]"
+    >
+      {props.children}
+    </button>
   );
 }

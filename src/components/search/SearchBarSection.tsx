@@ -27,8 +27,8 @@ export function SearchBarSection({
   onCopy,
 }: SearchBarSectionProps) {
   return (
-    <div className="space-y-3">
-      <div className="text-[16px] leading-6 text-[#8E8E93]">
+    <div className="space-y-0">
+      <div className="text-[9px] leading-4.5 text-[#8E8E93]">
         Select the level of search function and start AI-powered searching
         experience
       </div>
@@ -56,7 +56,7 @@ export function SearchBarSection({
 
         {/* Search input */}
         <div className="flex min-w-0 flex-1 items-center border-l border-[#D9D9D9] px-4">
-          <div className="mr-4 shrink-0 text-[18px] text-black">⌕</div>
+          <div className="mr-4 shrink-0 text-[36px] text-black">⌕</div>
 
           <input
             value={query}
@@ -70,7 +70,7 @@ export function SearchBarSection({
         <button
           type="button"
           onClick={onCopy}
-          className="flex w-12 shrink-0 items-center justify-center border-l border-[#D9D9D9] text-[20px] text-black transition hover:bg-[#F5F5F5]"
+          className="flex w-12 shrink-0 items-center justify-center border-l border-[#D9D9D9] text-[24px] text-black transition hover:bg-[#F5F5F5]"
           aria-label="Copy"
         >
           ⧉
@@ -80,7 +80,7 @@ export function SearchBarSection({
         <button
           type="button"
           onClick={onClear}
-          className="flex w-12 shrink-0 items-center justify-center border-l border-[#D9D9D9] text-[20px] text-black transition hover:bg-[#F5F5F5]"
+          className="flex w-12 shrink-0 items-center justify-center border-l border-[#D9D9D9] text-[24px] text-black transition hover:bg-[#F5F5F5]"
           aria-label="Clear"
         >
           ✕
@@ -103,7 +103,7 @@ function SearchTabButton(props: {
       type="button"
       onClick={onClick}
       className={[
-        "flex h-12 min-w-[144px] items-center justify-center px-6 text-[24px] font-semibold transition",
+        "flex h-12 min-w-[144px] items-center justify-center px-6 text-[18px] font-semibold transition",
         isFirst ? "" : "border-l border-[#D9D9D9]",
         active
           ? "bg-[#91E0B0] text-black"

@@ -51,11 +51,10 @@ export function FilterPanel({ searchTab }: FilterPanelProps) {
   }
 
   return (
-    <aside className="w-[288px] shrink-0 overflow-hidden rounded-[4px] border border-[#D9D9D9] bg-white">
-      <div className="flex h-16 items-center border-b border-[#D9D9D9] px-4">
+    <aside className="h-full w-full rounded-[4px] border border-[#D9D9D9] bg-white">
+      <div className="flex h-18 items-center border-b border-[#D9D9D9] px-4">
         <div className="flex items-center gap-3 text-black">
-          <span className="text-[18px]">⎘</span>
-          <span className="text-[24px] font-semibold leading-none">Filters</span>
+          <span className="text-[24px] leading-none">Filters</span>
         </div>
       </div>
 
@@ -68,7 +67,7 @@ export function FilterPanel({ searchTab }: FilterPanelProps) {
               <button
                 type="button"
                 onClick={() => toggleSection(section.id)}
-                className="flex h-12 w-full items-center justify-between px-4 text-left hover:bg-[#F5F5F5]"
+                className="flex h-9 w-full items-center justify-between px-4 text-left hover:bg-[#F5F5F5]"
               >
                 <span className="text-[16px] font-medium text-black">
                   {section.label}

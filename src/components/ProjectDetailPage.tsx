@@ -208,30 +208,30 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white">
+      <div className="min-h-screen bg-[#F5F5F5]">
         <PageTopBar />
-        <div className="mx-auto max-w-[1460px] px-8 py-6">
+        <div className="mx-auto max-w-[1460px] px-8 py-6 border border-[#D9D9D9]">
           <div className="flex items-center justify-end gap-3">
-            <div className="h-10 w-20 animate-pulse rounded-[12px] bg-neutral-200" />
-            <div className="h-10 w-28 animate-pulse rounded-[12px] bg-neutral-200" />
+            <div className="h-10 w-20 animate-pulse rounded-[4px] bg-neutral-200" />
+            <div className="h-10 w-28 animate-pulse rounded-[4px] bg-neutral-200" />
           </div>
 
           <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[560px_minmax(0,1fr)] lg:items-start">
-            <div className="h-[360px] animate-pulse rounded-[18px] bg-neutral-200" />
+            <div className="h-[360px] animate-pulse rounded-[4px] bg-neutral-200" />
             <div className="space-y-4">
-              <div className="h-10 w-2/3 animate-pulse rounded bg-neutral-200" />
-              <div className="h-4 w-1/3 animate-pulse rounded bg-neutral-200" />
-              <div className="h-4 w-full animate-pulse rounded bg-neutral-200" />
-              <div className="h-4 w-full animate-pulse rounded bg-neutral-200" />
-              <div className="h-4 w-5/6 animate-pulse rounded bg-neutral-200" />
-              <div className="h-4 w-4/5 animate-pulse rounded bg-neutral-200" />
+              <div className="h-10 w-2/3 animate-pulse rounded-[4px] bg-neutral-200" />
+              <div className="h-4 w-1/3 animate-pulse rounded-[4px] bg-neutral-200" />
+              <div className="h-4 w-full animate-pulse rounded-[4px] bg-neutral-200" />
+              <div className="h-4 w-full animate-pulse rounded-[4px] bg-neutral-200" />
+              <div className="h-4 w-5/6 animate-pulse rounded-[4px] bg-neutral-200" />
+              <div className="h-4 w-4/5 animate-pulse rounded-[4px] bg-neutral-200" />
             </div>
           </div>
 
           <div className="mt-10 space-y-4">
-            <div className="h-24 w-full animate-pulse rounded-[18px] bg-neutral-200" />
-            <div className="h-24 w-full animate-pulse rounded-[18px] bg-neutral-200" />
-            <div className="h-24 w-full animate-pulse rounded-[18px] bg-neutral-200" />
+            <div className="h-24 w-full animate-pulse rounded-[4px] bg-neutral-200" />
+            <div className="h-24 w-full animate-pulse rounded-[4px] bg-neutral-200" />
+            <div className="h-24 w-full animate-pulse rounded-[4px] bg-neutral-200" />
           </div>
         </div>
       </div>
@@ -243,7 +243,7 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
       <div className="min-h-screen bg-white">
         <PageTopBar />
         <div className="mx-auto max-w-[1460px] px-8 py-6">
-          <div className="rounded-[18px] border border-red-200 bg-white p-6">
+          <div className="rounded-[4px] border border-red-200 bg-white p-6">
             <div className="text-lg font-semibold">Loading failed</div>
             <div className="mt-2 text-sm text-neutral-500">{errMsg}</div>
             <div className="mt-4">
@@ -262,7 +262,7 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
       <div className="min-h-screen bg-white">
         <PageTopBar />
         <div className="mx-auto max-w-[1460px] px-8 py-6">
-          <div className="rounded-[18px] border bg-white p-6">
+          <div className="rounded-[4px] border bg-white p-6">
             <div className="text-lg font-semibold">Project does not exist</div>
             <div className="mt-4">
               <Link className="underline" href="/projects">
@@ -278,15 +278,15 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
   return (
     <div className="min-h-screen bg-white">
       {/* Thin shared top bar */}
-      <PageTopBar />
+      <PageTopBar/>
 
       {/* Main content */}
-      <main className="mx-auto w-full max-w-[1460px] px-8 py-6">
+      <main className="flex min-h-0 flex-1 flex-col px-9 pb-9">
         {/* Action buttons */}
-        <div className="flex items-center justify-end gap-3">
+        <div className="flex items-center justify-end gap-3 pt-3">
           {isSelectionMode && (
             <button
-              className="h-10 rounded-[12px] border border-neutral-300 bg-white px-4 text-sm text-neutral-800 hover:bg-neutral-50"
+              className="h-10 rounded-[4px] border border-neutral-300 bg-white px-4 text-sm text-neutral-800 hover:bg-neutral-50"
               onClick={() => setSelectedAssetIds([])}
               disabled={deleting}
             >
@@ -296,7 +296,7 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
 
           {isSelectionMode && (
             <button
-              className="h-10 rounded-[12px] border border-red-200 bg-white px-4 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
+              className="h-10 rounded-[4px] border border-red-200 bg-white px-4 text-sm text-red-600 hover:bg-red-50 disabled:opacity-50"
               onClick={deleteSelectedAssets}
               disabled={deleting}
             >
@@ -305,7 +305,7 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
           )}
 
           <Link
-            className="inline-flex h-10 items-center rounded-[12px] border border-neutral-300 bg-white px-4 text-sm text-neutral-800 hover:bg-neutral-50"
+            className="inline-flex h-10 items-center rounded-[4px] border border-neutral-300 bg-white px-4 text-sm text-neutral-800 hover:bg-neutral-50"
             href="/projects"
           >
             Back
@@ -313,16 +313,16 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
 
           <button
             onClick={() => setUploadOpen(true)}
-            className="h-10 rounded-[12px] border border-[#69c98e] bg-[#8fdbab] px-4 text-sm font-medium text-black transition hover:brightness-95"
+            className="h-10 rounded-[4px] border border-[#69c98e] bg-[#8fdbab] px-4 text-sm font-medium text-black transition hover:brightness-95"
           >
             Upload Asset
           </button>
         </div>
 
         {/* Project overview */}
-        <section className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[560px_minmax(0,1fr)] lg:items-start">
+        <section className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[560px_minmax(0,1fr)] lg:items-start border border-[#D9D9D9] rounded-[4px]">
           {/* Fixed-height cover image */}
-          <div className="overflow-hidden rounded-[18px] border border-neutral-200 bg-white">
+          <div className="overflow-hidden rounded-[4px] border border-neutral-200 bg-white">
             <div className="relative h-[360px] w-full bg-neutral-100">
               {coverAsset?.thumb_url ? (
                 <Image
@@ -372,14 +372,14 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search"
-                className="h-10 w-full rounded-[12px] border border-neutral-300 bg-white px-4 text-[14px] text-neutral-800 outline-none placeholder:text-neutral-400 focus:border-neutral-500 sm:w-80"
+                className="h-10 w-full rounded-[4px] border border-neutral-300 bg-white px-4 text-[14px] text-neutral-800 outline-none placeholder:text-neutral-400 focus:border-neutral-500 sm:w-80"
               />
             </div>
           </div>
 
           <div className="mt-5">
             {filteredAssets.length === 0 ? (
-              <div className="rounded-[18px] border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
+              <div className="rounded-[4px] border border-neutral-200 bg-white p-6 text-sm text-neutral-500">
                 No asset.
               </div>
             ) : (
@@ -387,7 +387,7 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
                 {groupedAssets.map(([groupName, groupAssets]) => (
                   <div
                     key={groupName}
-                    className="overflow-hidden rounded-[18px] border border-neutral-200 bg-white"
+                    className="overflow-hidden rounded-[4px] border border-neutral-200 bg-white"
                   >
                     {/* Group header */}
                     <div className="flex items-center justify-between border-b border-neutral-200 bg-neutral-50 px-4 py-3">
@@ -429,7 +429,7 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
                             className="flex min-w-0 flex-1 items-center gap-3"
                           >
                             {/* Preview */}
-                            <div className="relative h-12 w-20 shrink-0 overflow-hidden rounded-[10px] bg-neutral-100 sm:h-14 sm:w-24">
+                            <div className="relative h-12 w-20 shrink-0 overflow-hidden rounded-[4px] bg-neutral-100 sm:h-14 sm:w-24">
                               {a.thumb_url ? (
                                 <Image
                                   src={a.thumb_url}
@@ -491,15 +491,18 @@ export default function ProjectDetailPage({ projectId }: { projectId: string }) 
 /* ---------- Thin full-width top bar ---------- */
 function PageTopBar() {
   return (
-    <header className="w-full border-b border-neutral-200 bg-white">
-      <div className="mx-auto flex h-10 w-full max-w-[1460px] items-center justify-between px-8">
-        <div className="text-[16px] font-medium text-neutral-900">
-          Sample design base
+    <header className="w-full bg-black">
+      <div className="flex h-9 w-full items-center justify-between px-9">
+        <div className="flex items-center gap-4">
+          <div className="h-3 w-3 bg-[#91E0B0]" />
+          <div className="text-[16px] font-medium text-white">
+            Sample design base
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <div className="text-xs text-neutral-800">Admin</div>
-          <div className="h-7 w-7 rounded-full border border-neutral-500 bg-white" />
+        <div className="flex items-center gap-3">
+          <div className="text-[16px] text-white">Admin</div>
+          <div className="h-8 w-8 rounded-full bg-[#91E0B0]" />
         </div>
       </div>
     </header>
