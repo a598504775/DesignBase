@@ -14,6 +14,9 @@ import {
 import Link from "next/link";
 import { AssetSearchRow, searchAssets } from '@/lib/searchAssets';
 
+import { SearchBarSection } from "@/components/search/SearchBarSection";
+import { FilterPanel } from "@/components/search/FilterPanel";
+
 type Project = {
   id: string;
   title: string | null;
@@ -381,74 +384,104 @@ export default function ProjectsPage() {
 
       {/* Main content container */}
       <main className="mx-auto w-full max-w-[1460px] px-8 py-6">
+
+        <div className="mb-8 flex items-center justify-between">
+          <h1 className="text-[48px] font-bold leading-none text-black">Projects</h1>
+
+          <div className="flex items-center gap-3">
+            <button className="flex h-12 min-w-[48px] items-center justify-center rounded-[4px] border border-[#D9D9D9] bg-white text-black hover:bg-[#F5F5F5]">
+              ▦
+            </button>
+
+            <button className="flex h-12 min-w-[48px] items-center justify-center rounded-[4px] border border-[#D9D9D9] bg-white text-black hover:bg-[#F5F5F5]">
+              ☰
+            </button>
+
+            <button
+              onClick={() => setIsCreateOpen(true)}
+              className="flex h-12 items-center justify-center rounded-[4px] border border-[#66BF86] bg-[#91E0B0] px-6 text-[24px] font-medium text-black hover:brightness-95"
+            >
+              new project
+            </button>
+          </div>
+        </div>
+
         {/* Page title and toolbar */}
-        <ProjectsToolbar
+        <SearchBarSection
           searchTab={searchTab}
-          setSearchTab={setSearchTab}
           query={query}
+          onTabChange={setSearchTab}
           onQueryChange={setQuery}
-          onClickCreate={() => setIsCreateOpen(true)}
-        />
+          onClear={() => setQuery("")}
+          onCopy={() => {
+            navigator.clipboard.writeText(query);
+          }}
+        />        
 
         {/* Main project content */}
-        <section className="mt-8">
-          {!hasQuery && (
-            <>
-              {loadState === "loading" && <ProjectsSkeleton />}
-              {loadState === "error" && (
-                <ErrorState
-                  message={errorMsg}
-                  onRetry={() => window.location.reload()}
-                />
-              )}
-              {loadState === "ready" && projects.length === 0 && (
-                <EmptyState onClickCreate={() => setIsCreateOpen(true)} />
-              )}
-              {loadState === "ready" && projects.length > 0 && (
-                <ProjectsGrid
-                  projects={projects}
-                  deletingProjectId={deletingProjectId}
-                  openMenuProjectId={openMenuProjectId}
-                  onOpenMenu={setOpenMenuProjectId}
-                  onDeleteProject={handleDeleteProject}
-                />
-              )}
-            </>
-          )}
+        <section className="mt-8 flex items-start gap-12">
+          <FilterPanel searchTab={searchTab} />
 
-          {hasQuery && searchTab === "projects" && (
-            <>
-              {loadState === "loading" && <ProjectsSkeleton />}
-              {loadState === "error" && (
-                <ErrorState
-                  message={errorMsg}
-                  onRetry={() => window.location.reload()}
-                />
-              )}
-              {loadState === "ready" && projects.length === 0 && (
-                <EmptyState onClickCreate={() => setIsCreateOpen(true)} />
-              )}
-              {loadState === "ready" && projects.length > 0 && filtered.length === 0 && (
-                <NoResultsState />
-              )}
-              {loadState === "ready" && filtered.length > 0 && (
-                <ProjectsGrid
-                  projects={filtered}
-                  deletingProjectId={deletingProjectId}
-                  openMenuProjectId={openMenuProjectId}
-                  onOpenMenu={setOpenMenuProjectId}
-                  onDeleteProject={handleDeleteProject}
-                />
-              )}
-            </>
-          )}
+          <div className="min-w-0 flex-1">
+            {!hasQuery && (
+              <>
+                {loadState === "loading" && <ProjectsSkeleton />}
+                {loadState === "error" && (
+                  <ErrorState
+                    message={errorMsg}
+                    onRetry={() => window.location.reload()}
+                  />
+                )}
+                {loadState === "ready" && projects.length === 0 && (
+                  <EmptyState onClickCreate={() => setIsCreateOpen(true)} />
+                )}
+                {loadState === "ready" && projects.length > 0 && (
+                  <ProjectsGrid
+                    projects={projects}
+                    deletingProjectId={deletingProjectId}
+                    openMenuProjectId={openMenuProjectId}
+                    onOpenMenu={setOpenMenuProjectId}
+                    onDeleteProject={handleDeleteProject}
+                  />
+                )}
+              </>
+            )}
 
-          {hasQuery && searchTab === "assets" && (
-            <AssetResults groups={groupedAssetResults} loading={searchingAssets} />
-          )}
-          {hasQuery && searchTab === "contents" && (
-            <ContentResults groups={groupedContentResults} loading={searchingContents} />
-          )}
+            {hasQuery && searchTab === "projects" && (
+              <>
+                {loadState === "loading" && <ProjectsSkeleton />}
+                {loadState === "error" && (
+                  <ErrorState
+                    message={errorMsg}
+                    onRetry={() => window.location.reload()}
+                  />
+                )}
+                {loadState === "ready" && projects.length === 0 && (
+                  <EmptyState onClickCreate={() => setIsCreateOpen(true)} />
+                )}
+                {loadState === "ready" && projects.length > 0 && filtered.length === 0 && (
+                  <NoResultsState />
+                )}
+                {loadState === "ready" && filtered.length > 0 && (
+                  <ProjectsGrid
+                    projects={filtered}
+                    deletingProjectId={deletingProjectId}
+                    openMenuProjectId={openMenuProjectId}
+                    onOpenMenu={setOpenMenuProjectId}
+                    onDeleteProject={handleDeleteProject}
+                  />
+                )}
+              </>
+            )}
+
+            {hasQuery && searchTab === "assets" && (
+              <AssetResults groups={groupedAssetResults} loading={searchingAssets} />
+            )}
+
+            {hasQuery && searchTab === "contents" && (
+              <ContentResults groups={groupedContentResults} loading={searchingContents} />
+            )}
+          </div>
         </section>
 
         {/* Create project modal */}
@@ -483,70 +516,6 @@ function PageTopBar() {
   );
 }
 
-/* ---------- Title row and compact toolbar ---------- */
-function ProjectsToolbar(props: {
-  query: string;
-  searchTab: SearchTab;
-  setSearchTab: (value: SearchTab) => void;
-  onQueryChange: (v: string) => void;
-  onClickCreate: () => void;
-}) {
-  return (
-    <div className="flex flex-col gap-4">
-      {/* Title row */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-[38px] font-semibold tracking-tight text-black">
-          Projects
-        </h1>
-
-        <button
-          onClick={props.onClickCreate}
-          className="h-10 rounded-[12px] border border-[#69c98e] bg-[#8fdbab] px-5 text-[15px] font-medium text-black transition hover:brightness-95"
-        >
-          new project
-        </button>
-      </div>
-
-      {/* Search and placeholder controls */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-[320px] flex-1 space-y-2">
-          <Select value={props.searchTab} onValueChange={props.setSearchTab}>
-            <SelectTrigger className="h-10 rounded-[12px] border-neutral-300">
-              <SelectValue placeholder="Select tab" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="projects">Projects</SelectItem>
-              <SelectItem value="assets">Assets</SelectItem>
-              <SelectItem value="contents">Contents</SelectItem>
-            </SelectContent>
-          </Select>
-          <input
-            value={props.query}
-            onChange={(e) => props.onQueryChange(e.target.value)}
-            placeholder="Search"
-            className="h-10 w-full rounded-[12px] border border-neutral-300 bg-white px-4 text-[14px] text-neutral-800 outline-none placeholder:text-neutral-400 focus:border-neutral-500"
-          />
-        </div>
-
-        <button className="h-10 rounded-[12px] border border-neutral-300 bg-white px-4 text-[14px] text-neutral-800 transition hover:bg-neutral-50">
-          Sorted by name
-        </button>
-
-        <button className="h-10 rounded-[12px] border border-neutral-300 bg-white px-4 text-[14px] text-neutral-800 transition hover:bg-neutral-50">
-          Filter
-        </button>
-
-        <button className="flex h-10 w-10 items-center justify-center rounded-[12px] border border-neutral-300 bg-white text-[15px] text-neutral-700 transition hover:bg-neutral-50">
-          ▦
-        </button>
-
-        <button className="flex h-10 w-10 items-center justify-center rounded-[12px] border border-neutral-300 bg-white text-[15px] text-neutral-700 transition hover:bg-neutral-50">
-          ☰
-        </button>
-      </div>
-    </div>
-  );
-}
 
 /* ---------- Project grid ---------- */
 function ProjectsGrid(props: {
